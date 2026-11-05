@@ -18,7 +18,7 @@ function setTheme(isDark: boolean) {
   } catch {}
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ onImage = false }: { onImage?: boolean }) {
   return (
     <button
       type="button"
@@ -27,7 +27,11 @@ export function ThemeToggle() {
         const next = !getIsDarkFromDom();
         setTheme(next);
       }}
-      className="inline-flex h-10 items-center gap-2 rounded-full border border-zinc-200 px-3 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10"
+      className={`inline-flex h-10 items-center gap-2 rounded-full border px-3 transition-colors ${
+        onImage
+          ? "border-white/30 text-white hover:bg-white/10"
+          : "border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10"
+      }`}
     >
       <svg
         aria-hidden="true"

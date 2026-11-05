@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 
-export function MobileMenu() {
+export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
 
@@ -33,7 +33,11 @@ export function MobileMenu() {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen(true)}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10 md:hidden"
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors md:hidden ${
+          onImage
+            ? "border-white/30 text-white hover:bg-white/10"
+            : "border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10"
+        }`}
       >
         <svg
           aria-hidden="true"

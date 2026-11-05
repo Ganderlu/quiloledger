@@ -31,3 +31,22 @@ html {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Landing hero: one continuous night-view image covering the navbar + hero. */
+.qlx-night-bg {
+  background-image: url("/night-view.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Darkens the image for text contrast and blends the bottom into the page. */
+.qlx-hero-scrim {
+  background-image: linear-gradient(
+    to bottom,
+    rgba(2, 6, 23, 0.9) 0%,
+    rgba(2, 6, 23, 0.76) 42%,
+    rgba(2, 6, 23, 0.58) 72%,
+    var(--background) 100%
+  );
+}
