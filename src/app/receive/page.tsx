@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import {
+  MobileWalletNav,
+  WalletPageHeader,
+} from "../_components/WalletNavigation";
 
 export default function ReceivePage() {
   const address = useMemo(() => "qlx_9f2c1a8d7b4e3f6a", []);
@@ -18,7 +22,9 @@ export default function ReceivePage() {
   }, [address]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10">
+    <>
+      <WalletPageHeader active="Receive" />
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 pb-28 sm:pb-10">
       <h1 className="text-2xl font-semibold tracking-tight">Receive</h1>
       <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
         Share this address to receive funds into your QuiloxLedger wallet.
@@ -44,6 +50,8 @@ export default function ReceivePage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      <MobileWalletNav active="Receive" />
+    </>
   );
 }

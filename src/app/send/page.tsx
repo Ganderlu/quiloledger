@@ -1,6 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  MobileWalletNav,
+  WalletPageHeader,
+} from "../_components/WalletNavigation";
 
 export default function SendPage() {
   const [recipient, setRecipient] = useState("");
@@ -17,7 +21,9 @@ export default function SendPage() {
   }, [amount, recipient]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10">
+    <>
+      <WalletPageHeader active="Send" />
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 pb-28 sm:pb-10">
       <h1 className="text-2xl font-semibold tracking-tight">Send</h1>
       <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
         Enter a recipient and an amount to prepare a transfer.
@@ -67,6 +73,8 @@ export default function SendPage() {
           Send (placeholder)
         </button>
       </div>
-    </div>
+      </div>
+      <MobileWalletNav active="Send" />
+    </>
   );
 }

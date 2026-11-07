@@ -20,6 +20,17 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [isHome]);
 
+  if (
+    pathname === "/dashboard" ||
+    pathname === "/card" ||
+    pathname === "/swap" ||
+    pathname === "/settings" ||
+    pathname === "/send" ||
+    pathname === "/receive"
+  ) {
+    return null;
+  }
+
   const overImage = isHome && !scrolled;
 
   const navLink = overImage

@@ -32,6 +32,70 @@ html {
   color: var(--foreground);
 }
 
+.dark .qlx-wallet-app header,
+.dark .qlx-wallet-app aside,
+.dark .qlx-wallet-app section,
+.dark .qlx-wallet-app nav,
+.dark .qlx-wallet-app [class~="bg-white"] {
+  background-color: #171e23 !important;
+  border-color: #293238;
+}
+
+.dark .qlx-wallet-app [class~="bg-[#f0f0f0]"],
+.dark .qlx-wallet-app [class~="bg-[#f2f5f7]"],
+.dark .qlx-wallet-app [class~="bg-[#f3f5f6]"],
+.dark .qlx-wallet-app [class~="bg-[#f4f6f7]"],
+.dark .qlx-wallet-app [class~="bg-[#f6f8fa]"],
+.dark .qlx-wallet-app [class~="bg-[#f7f7f7]"],
+.dark .qlx-wallet-app [class~="bg-[#f7f8fa]"],
+.dark .qlx-wallet-app [class~="bg-[#f7f9fa]"],
+.dark .qlx-wallet-app [class~="bg-[#fafbfc]"] {
+  background-color: #202930 !important;
+}
+
+.dark .qlx-wallet-app [class*="text-[#111"],
+.dark .qlx-wallet-app [class*="text-[#20252b"],
+.dark .qlx-wallet-app [class*="text-[#25282d"],
+.dark .qlx-wallet-app [class*="text-[#303"],
+.dark .qlx-wallet-app [class*="text-[#343"],
+.dark .qlx-wallet-app [class*="text-[#3d"],
+.dark .qlx-wallet-app [class*="text-[#404"],
+.dark .qlx-wallet-app [class*="text-[#414"],
+.dark .qlx-wallet-app [class*="text-[#424"],
+.dark .qlx-wallet-app [class*="text-[#454"],
+.dark .qlx-wallet-app [class*="text-[#465"],
+.dark .qlx-wallet-app [class*="text-[#485"],
+.dark .qlx-wallet-app [class*="text-[#4b"],
+.dark .qlx-wallet-app [class*="text-[#515"],
+.dark .qlx-wallet-app [class*="text-[#526"],
+.dark .qlx-wallet-app [class*="text-[#535"],
+.dark .qlx-wallet-app [class*="text-[#555"],
+.dark .qlx-wallet-app [class*="text-[#596"],
+.dark .qlx-wallet-app [class*="text-[#626"],
+.dark .qlx-wallet-app [class*="text-[#666"],
+.dark .qlx-wallet-app [class*="text-[#687"],
+.dark .qlx-wallet-app [class*="text-[#6b"],
+.dark .qlx-wallet-app [class*="text-[#707"],
+.dark .qlx-wallet-app [class*="text-[#737"],
+.dark .qlx-wallet-app [class*="text-[#778"],
+.dark .qlx-wallet-app [class*="text-[#798"],
+.dark .qlx-wallet-app [class*="text-[#7c"],
+.dark .qlx-wallet-app [class*="text-[#7e"],
+.dark .qlx-wallet-app [class*="text-[#818"],
+.dark .qlx-wallet-app [class*="text-[#858"],
+.dark .qlx-wallet-app [class*="text-[#899"],
+.dark .qlx-wallet-app [class*="text-[#8a"],
+.dark .qlx-wallet-app [class*="text-[#8b"],
+.dark .qlx-wallet-app [class*="text-[#8d"],
+.dark .qlx-wallet-app [class*="text-[#8e"],
+.dark .qlx-wallet-app [class*="text-[#919"],
+.dark .qlx-wallet-app [class*="text-[#929"],
+.dark .qlx-wallet-app [class*="text-[#949"],
+.dark .qlx-wallet-app [class*="text-[#979"],
+.dark .qlx-wallet-app [class*="text-[#9aa"] {
+  color: #d2dbe0 !important;
+}
+
 /* Landing hero: one continuous night-view image covering the navbar + hero. */
 .qlx-night-bg {
   background-image: url("/night-view.jpg");

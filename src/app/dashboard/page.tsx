@@ -1,54 +1,713 @@
-export default function DashboardPage() {
-  const balances = [
-    { label: "Main", amount: "$0.00" },
-    { label: "Savings", amount: "$0.00" },
-  ];
+"use client";
 
-  const recentActivity = [
-    { id: "1", label: "Welcome to QuiloxLedger", meta: "Set up your first wallet flow" },
-    { id: "2", label: "Receive funds", meta: "Share your address from the Receive page" },
-  ];
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import {
+  DesktopWalletNav,
+  MobileWalletNav,
+} from "../_components/WalletNavigation";
+import { MobileSettingsSheet } from "../_components/SettingsPanel";
+import {
+  getStoredBoolean,
+  getStoredCurrency,
+  setWalletPreference,
+  walletPreferenceKeys,
+  walletPreferencesChangedEvent,
+  type WalletCurrency,
+} from "@/lib/wallet-preferences";
+
+const assets = [
+  {
+    name: "Aerodrome Finance",
+    ticker: "AERO",
+    price: "₦1,131.85",
+    change: "+2.30%",
+    up: true,
+    icon: "aero",
+  },
+  {
+    name: "Bitcoin",
+    ticker: "BTC",
+    price: "₦91,305,895.85",
+    change: "-0.18%",
+    up: false,
+    icon: "btc",
+  },
+  {
+    name: "Bitcoin Cash",
+    ticker: "BCH",
+    price: "₦43,374.20",
+    change: "-0.20%",
+    up: false,
+    icon: "bch",
+  },
+  {
+    name: "BNB",
+    ticker: "BNB",
+    price: "₦1,007,901.60",
+    change: "-0.07%",
+    up: false,
+    icon: "bnb",
+  },
+  {
+    name: "Cardano",
+    ticker: "ADA",
+    price: "₦1,042.48",
+    change: "+0.54%",
+    up: true,
+    icon: "ada",
+  },
+  {
+    name: "Ethereum",
+    ticker: "ETH",
+    price: "₦3,246,820.00",
+    change: "+1.12%",
+    up: true,
+    icon: "eth",
+  },
+  {
+    name: "Solana",
+    ticker: "SOL",
+    price: "₦218,460.50",
+    change: "-0.36%",
+    up: false,
+    icon: "sol",
+  },
+] as const;
+
+function Icon({
+  name,
+  className = "h-5 w-5",
+}: {
+  name: string;
+  className?: string;
+}) {
+  const props = {
+    "aria-hidden": true as const,
+    className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
+  switch (name) {
+    case "settings":
+      return (
+        <svg {...props}>
+          <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" />
+          <path d="m19.4 15 .1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 0 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 0 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3h-.2a1.8 1.8 0 0 1 0-3.6h.2a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 0 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 0 1 3.6 0v.2a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 0 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 0 1 0 3.6h-.2a1.8 1.8 0 0 0-.9 3Z" />
+        </svg>
+      );
+    case "bell":
+      return (
+        <svg {...props}>
+          <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
+      );
+    case "wallet":
+      return (
+        <svg {...props}>
+          <rect x="3" y="5" width="18" height="15" rx="2" />
+          <path d="M3 9h18M16 14h.01M6 5V3h12v2" />
+        </svg>
+      );
+    case "search":
+      return (
+        <svg {...props}>
+          <circle cx="10.8" cy="10.8" r="6.8" />
+          <path d="m16 16 4.5 4.5" />
+        </svg>
+      );
+    case "eye":
+      return (
+        <svg {...props}>
+          <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6Z" />
+          <circle cx="12" cy="12" r="2.5" />
+        </svg>
+      );
+    case "refresh":
+      return (
+        <svg {...props}>
+          <path d="M20 7v5h-5M4.6 9a7.5 7.5 0 0 1 12.7-3L20 9M4 17v-5h5m10.4 3a7.5 7.5 0 0 1-12.7 3L4 15" />
+        </svg>
+      );
+    case "send":
+      return (
+        <svg {...props}>
+          <path d="m21 3-7.2 18-3.4-7.4L3 10.2 21 3Z" />
+          <path d="M10.4 13.6 15 9" />
+        </svg>
+      );
+    case "receive":
+      return (
+        <svg {...props}>
+          <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3" />
+        </svg>
+      );
+    case "home":
+      return (
+        <svg {...props}>
+          <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V10Z" />
+        </svg>
+      );
+    case "swap":
+      return (
+        <svg {...props}>
+          <path d="M4 7h14m0 0-3-3m3 3-3 3M20 17H6m0 0 3-3m-3 3 3 3" />
+        </svg>
+      );
+    case "card":
+      return (
+        <svg {...props}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 10h18m-14 5h4" />
+        </svg>
+      );
+    case "chat":
+      return (
+        <svg {...props}>
+          <path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.8 8.8 0 0 1-3.5-.7L4 20l1.3-3.6A7.2 7.2 0 0 1 4 12c0-4.2 3.6-7.5 8-7.5s8 3.1 8 7Z" />
+          <path d="M8 12h.01M12 12h.01M16 12h.01" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function AssetIcon({ kind }: { kind: (typeof assets)[number]["icon"] }) {
+  if (kind === "aero") {
+    return (
+      <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#eef3ff]">
+        <span className="absolute h-5 w-5 -rotate-45 rounded-full border-[2px] border-b-transparent border-r-transparent border-blue-500" />
+        <span className="absolute h-4 w-4 rotate-45 rounded-full border-[2px] border-l-transparent border-t-transparent border-red-500" />
+      </span>
+    );
+  }
+  const styles = {
+    btc: "bg-[#f7931a] text-white",
+    bch: "bg-[#82bd45] text-white",
+    bnb: "bg-[#f0b90b] text-white",
+    ada: "bg-[#edf4ff] text-[#2869db]",
+    eth: "bg-[#edf0ff] text-[#5265b8]",
+    sol: "bg-[#17152e] text-white",
+  };
+  const symbols = {
+    btc: "₿",
+    bch: "₿",
+    bnb: "◆",
+    ada: "⠿",
+    eth: "♦",
+    sol: "≋",
+  };
+  return (
+    <span
+      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xl font-bold ${styles[kind]}`}
+    >
+      {symbols[kind]}
+    </span>
+  );
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [search, setSearch] = useState("");
+  const [balanceVisible, setBalanceVisible] = useState(true);
+  const [notice, setNotice] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [currency, setCurrency] = useState<WalletCurrency>("NGN");
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
+  const filteredAssets = useMemo(
+    () =>
+      assets.filter((asset) =>
+        `${asset.name} ${asset.ticker}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      ),
+    [search],
+  );
+
+  function showNotice(message: string) {
+    setNotice(message);
+    window.setTimeout(() => setNotice(""), 2800);
+  }
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        router.replace("/login");
+        return;
+      }
+      setUser(currentUser);
+      setChecking(false);
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  useEffect(() => {
+    const syncPreferences = () => {
+      setBalanceVisible(!getStoredBoolean(walletPreferenceKeys.hideBalance));
+      setCurrency(getStoredCurrency());
+    };
+    syncPreferences();
+    window.addEventListener(walletPreferencesChangedEvent, syncPreferences);
+    window.addEventListener("storage", syncPreferences);
+    return () => {
+      window.removeEventListener(
+        walletPreferencesChangedEvent,
+        syncPreferences,
+      );
+      window.removeEventListener("storage", syncPreferences);
+    };
+  }, []);
+
+  function openSettings() {
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setSettingsOpen(true);
+      return;
+    }
+    router.push("/settings");
+  }
+
+  function toggleBalanceVisibility() {
+    const shouldHide = balanceVisible;
+    setBalanceVisible(!balanceVisible);
+    setWalletPreference(walletPreferenceKeys.hideBalance, String(shouldHide));
+  }
+
+  async function handleSignOut() {
+    await signOut(auth);
+    router.replace("/login");
+  }
+
+  async function refreshMarket() {
+    setRefreshing(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    setRefreshing(false);
+    showNotice("Market preview refreshed.");
+  }
+
+  if (checking) {
+    return (
+      <div className="grid min-h-[70vh] flex-1 place-items-center bg-[#f7f8fa] px-4">
+        <p className="text-sm text-zinc-500">Loading your wallet…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-            Wallet overview and recent activity.
+    <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
+      <div className="h-1 w-full bg-[#27c84a]" />
+      <header className="sticky top-0 z-30 border-b border-[#eceef1] bg-white/95 backdrop-blur dark:border-[#293238] dark:bg-[#171e23]/95">
+        <div className="mx-auto flex h-[58px] max-w-[1440px] items-center justify-between px-3 sm:px-6 lg:px-10">
+          <div className="flex items-center gap-1.5 sm:gap-4">
+            <button
+              type="button"
+              aria-label="Settings"
+              onClick={openSettings}
+              className="grid h-8 w-7 place-items-center text-[#555c64] transition active:scale-95 sm:h-9 sm:w-8"
+            >
+              <Icon name="settings" className="h-[18px] w-[18px]" />
+            </button>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-1.5 text-[16px] font-bold tracking-tight text-[#111820] sm:gap-2 sm:text-[20px]"
+            >
+              <span className="grid h-6 w-6 place-items-center rounded-lg bg-[#071720] text-white sm:h-7 sm:w-7">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
+                  fill="none"
+                >
+                  <path
+                    d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M8 12h8M12 8v8"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              QuiloxLedger
+            </Link>
+          </div>
+          <DesktopWalletNav active="Home" />
+          <div className="flex items-center gap-1 sm:gap-3">
+            <div className="relative">
+              <button
+                type="button"
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
+                onClick={() => setNotificationsOpen((open) => !open)}
+                className="grid h-8 w-7 place-items-center text-[#555c64] transition active:scale-95 sm:h-9 sm:w-8"
+              >
+                <Icon name="bell" className="h-[18px] w-[18px]" />
+              </button>
+              {notificationsOpen ? (
+                <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-[#e8eaee] bg-white p-4 shadow-xl">
+                  <p className="text-sm font-semibold">You’re all caught up</p>
+                  <p className="mt-1 text-xs leading-5 text-[#737a83]">
+                    Important wallet updates will appear here.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                aria-label="Wallet account"
+                aria-expanded={accountOpen}
+                onClick={() => setAccountOpen((open) => !open)}
+                className="grid h-8 w-7 place-items-center text-[#555c64] transition active:scale-95 sm:h-9 sm:w-8"
+              >
+                <Icon name="wallet" className="h-[18px] w-[18px]" />
+              </button>
+              {accountOpen ? (
+                <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-[#e8eaee] bg-white p-4 shadow-xl">
+                  <p className="truncate text-sm font-semibold">
+                    {user?.displayName || "Your account"}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-[#737a83]">
+                    {user?.email}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="mt-4 h-9 w-full rounded-lg border border-[#e8eaee] text-xs font-semibold text-[#4b5158] hover:bg-[#f7f8fa]"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="ml-2 hidden h-9 items-center rounded-full border border-[#e3e6e9] px-4 text-xs font-semibold text-[#434a52] transition hover:bg-[#f4f5f6] sm:inline-flex"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-3 sm:px-6 sm:pb-12 sm:pt-7 lg:px-10">
+        <div className="mb-6 hidden items-end justify-between sm:flex">
+          <div>
+            <p className="text-sm font-medium text-[#777e87]">
+              Good to see you,
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#20252b]">
+              {user?.displayName || user?.email?.split("@")[0] || "Welcome"}
+            </h1>
+          </div>
+          <p className="text-xs text-[#9298a0]">
+            Your personal wallet overview
           </p>
         </div>
-      </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {balances.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950"
-          >
-            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {item.label}
-            </div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight">
-              {item.amount}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-        <h2 className="text-base font-semibold">Recent activity</h2>
-        <div className="mt-4 divide-y divide-zinc-200 dark:divide-zinc-800">
-          {recentActivity.map((item) => (
-            <div key={item.id} className="py-4">
-              <div className="text-sm font-medium">{item.label}</div>
-              <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                {item.meta}
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
+          <section className="min-w-0">
+            <div className="relative overflow-hidden rounded-[10px] bg-[#075b9d] px-4 py-3.5 text-white shadow-[0_8px_22px_rgba(5,75,130,0.12)] sm:rounded-2xl sm:px-7 sm:py-6">
+              <div className="pointer-events-none absolute -right-8 -top-20 h-52 w-52 rounded-full border border-white/10" />
+              <div className="pointer-events-none absolute -right-2 -top-12 h-40 w-40 rounded-full border border-white/10" />
+              <div className="relative flex items-start justify-between">
+                <div>
+                  <div className="text-[12px] font-semibold tracking-wide text-white/80 sm:text-sm">
+                    Total Value
+                  </div>
+                  <div className="mt-1 flex items-center gap-3 text-[26px] font-medium leading-none tracking-tight sm:mt-2 sm:text-4xl">
+                    <span className="text-[21px] sm:text-3xl">
+                      {currency === "USD"
+                        ? "$"
+                        : currency === "EUR"
+                          ? "€"
+                          : "₦"}
+                    </span>
+                    <span>{balanceVisible ? "0.00" : "••••••"}</span>
+                    <button
+                      type="button"
+                      aria-label={
+                        balanceVisible ? "Hide balance" : "Show balance"
+                      }
+                      onClick={toggleBalanceVisibility}
+                      className="grid h-8 w-8 place-items-center rounded-full text-white/90 transition hover:bg-white/10 active:scale-95"
+                    >
+                      <Icon name="eye" className="h-[17px] w-[17px]" />
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Refresh market preview"
+                  onClick={refreshMarket}
+                  className="grid h-8 w-8 place-items-center rounded-full text-white/90 transition hover:bg-white/10 active:scale-95"
+                >
+                  <Icon
+                    name="refresh"
+                    className={`h-[17px] w-[17px] ${refreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
+              </div>
+              <div className="relative mt-4 hidden items-center gap-2 text-xs text-white/70 sm:flex">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#47df83]" />
+                Wallet balance<span className="ml-auto">{currency}</span>
               </div>
             </div>
-          ))}
+
+            <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-4">
+              <button
+                type="button"
+                onClick={() =>
+                  showNotice("Wallet connections are not available yet.")
+                }
+                className="group min-h-[130px] rounded-[10px] bg-[#f0f0f0] px-3.5 py-3 text-left transition hover:bg-[#e9edf2] active:scale-[0.99] sm:min-h-[170px] sm:rounded-2xl sm:px-6 sm:py-5"
+              >
+                <span className="mx-auto mb-2 grid h-8 w-10 place-items-center text-[#2895f5] sm:mb-3 sm:h-10 sm:w-12">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 48 40"
+                    className="h-full w-full"
+                    fill="none"
+                  >
+                    <path
+                      d="M8 16c4-7 10-11 17-11s13 4 17 11l-6 5c-3-5-7-8-11-8s-8 3-11 8l-6-5Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M4 24c5 8 12 12 21 12s16-4 21-12l-6-5c-4 5-9 8-15 8s-11-3-15-8l-6 5Z"
+                      fill="currentColor"
+                      opacity=".68"
+                    />
+                  </svg>
+                </span>
+                <span className="block text-[11px] font-medium leading-4 text-[#30353b] sm:text-base sm:leading-5">
+                  Connect Wallet
+                </span>
+                <span className="mt-1 block text-[10px] leading-[1.35] text-[#737980] sm:text-sm sm:leading-5">
+                  Connect Trust, MetaMask and other wallets when wallet linking
+                  is available.
+                </span>
+                <span className="mt-1.5 block text-[11px] font-medium text-[#0877d1] sm:mt-2 sm:text-sm">
+                  Connect Now →
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  showNotice("Crypto purchases are not available yet.")
+                }
+                className="group min-h-[130px] rounded-[10px] bg-[#f0f0f0] px-3.5 py-3 text-left transition hover:bg-[#e9edf2] active:scale-[0.99] sm:min-h-[170px] sm:rounded-2xl sm:px-6 sm:py-5"
+              >
+                <span className="mx-auto mb-2 grid h-8 w-10 place-items-center text-[#075b9d] sm:mb-3 sm:h-10 sm:w-12">
+                  <Icon name="card" className="h-7 w-7 sm:h-8 sm:w-8" />
+                </span>
+                <span className="block text-[11px] font-medium leading-4 text-[#30353b] sm:text-base sm:leading-5">
+                  Buy Crypto
+                </span>
+                <span className="mt-1 block text-[10px] leading-[1.35] text-[#737980] sm:text-sm sm:leading-5">
+                  Purchase directly using Credit Card
+                </span>
+                <span className="mt-1.5 block text-[11px] font-medium text-[#0877d1] sm:mt-2 sm:text-sm">
+                  Buy Now →
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <aside className="hidden rounded-2xl border border-[#eceef1] bg-white p-6 lg:block dark:border-[#293238] dark:bg-[#171e23]">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#343a40]">
+                  Your account
+                </p>
+                <p className="mt-1 text-xs text-[#8a9098]">
+                  Signed in securely
+                </p>
+              </div>
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-[#e8f4ed] text-sm font-bold text-[#239451]">
+                {(user?.displayName || user?.email || "Q")
+                  .slice(0, 1)
+                  .toUpperCase()}
+              </span>
+            </div>
+            <div className="mt-5 border-t border-[#eff0f2] pt-4">
+              <p className="text-[11px] uppercase tracking-[.12em] text-[#9298a0]">
+                Email address
+              </p>
+              <p className="mt-1 break-all text-sm font-medium text-[#3a4047]">
+                {user?.email}
+              </p>
+            </div>
+            <div className="mt-5 rounded-xl bg-[#f6f8fa] p-4 dark:bg-[#202930]">
+              <p className="text-sm font-semibold text-[#333a42]">
+                Getting started
+              </p>
+              <p className="mt-1.5 text-xs leading-5 text-[#79818a]">
+                Your account is ready. Wallet and purchase integrations can be
+                connected as they become available.
+              </p>
+            </div>
+            <Link
+              href="/card"
+              className="group mt-4 flex items-center gap-3 rounded-xl bg-[#0c2932] p-3.5 text-white transition hover:bg-[#123a45] active:scale-[.99]"
+            >
+              <span className="grid h-10 w-14 shrink-0 place-items-center rounded-md border border-white/15 bg-gradient-to-br from-[#1c4c53] to-[#102c34]">
+                <Icon name="card" className="h-5 w-5 text-white/85" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold">Quilox card</span>
+                <span className="mt-1 block text-[10px] text-white/60">
+                  Preview and manage card settings
+                </span>
+              </span>
+              <span className="text-sm text-white/70 transition-transform group-hover:translate-x-0.5">
+                →
+              </span>
+            </Link>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl border border-[#e4e7eb] text-sm font-semibold text-[#505760] transition hover:bg-[#f6f7f8] active:scale-[.99]"
+            >
+              Sign out of QuiloxLedger
+            </button>
+          </aside>
         </div>
-      </div>
+
+        <section className="mt-4 overflow-hidden rounded-t-[18px] bg-white sm:mt-6 sm:rounded-2xl sm:border sm:border-[#eceef1] sm:shadow-[0_8px_26px_rgba(25,36,50,0.035)] dark:bg-[#171e23] dark:sm:border-[#293238]">
+          <div className="flex justify-center pt-2 sm:hidden">
+            <span className="h-[3px] w-9 rounded-full bg-[#6a6d70]" />
+          </div>
+          <div className="px-0 pb-1 pt-2 sm:flex sm:items-center sm:justify-between sm:px-5 sm:pb-4 sm:pt-5">
+            <div className="hidden sm:block">
+              <h2 className="text-base font-bold text-[#30363d]">Market</h2>
+              <p className="mt-1 text-xs text-[#9197a0]">
+                Popular digital assets · demo prices
+              </p>
+            </div>
+            <label className="mt-1 flex h-[34px] items-center gap-2.5 rounded-full border border-[#e8e9eb] bg-[#f7f7f7] px-3.5 sm:mt-0 sm:h-10 sm:w-[320px] sm:bg-white">
+              <Icon
+                name="search"
+                className="h-[17px] w-[17px] text-[#7c828a]"
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search"
+                aria-label="Search assets"
+                className="h-full min-w-0 flex-1 bg-transparent text-xs text-[#333a41] outline-none placeholder:text-[#7a7e83] sm:text-sm"
+              />
+            </label>
+          </div>
+          <div className="hidden grid-cols-[minmax(240px,1fr)_160px_130px] border-y border-[#f0f1f3] px-5 py-3 text-[10px] font-semibold uppercase tracking-[.12em] text-[#9aa0a8] md:grid">
+            <span>Asset</span>
+            <span className="text-right">Price</span>
+            <span className="text-right">24h change</span>
+          </div>
+          <div className="divide-y divide-[#f1f2f3]">
+            {filteredAssets.map((asset) => (
+              <div
+                key={asset.ticker}
+                className="grid min-h-[62px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-0 py-2 sm:px-5 md:grid-cols-[minmax(240px,1fr)_160px_130px] md:py-3.5"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <AssetIcon kind={asset.icon} />
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium leading-5 text-[#3d4146] sm:text-sm">
+                      {asset.name}
+                    </p>
+                    <p className="mt-0.5 text-[9px] leading-3 text-[#94999f] sm:text-[11px]">
+                      {asset.price}{" "}
+                      <span
+                        className={
+                          asset.up ? "text-[#20a95a]" : "text-[#eb535a]"
+                        }
+                      >
+                        {asset.change}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right md:hidden">
+                  <p className="text-[13px] font-semibold leading-5 text-[#40454a]">
+                    0 {asset.ticker}
+                  </p>
+                  <p className="mt-0.5 text-[9px] leading-3 text-[#93999f]">
+                    ₦0
+                  </p>
+                </div>
+                <p className="hidden text-right text-sm font-medium text-[#454b52] md:block">
+                  {asset.price}
+                </p>
+                <p
+                  className={`hidden text-right text-sm font-medium md:block ${asset.up ? "text-[#20a95a]" : "text-[#e35a60]"}`}
+                >
+                  {asset.change}
+                </p>
+              </div>
+            ))}
+            {filteredAssets.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-[#7c838b] sm:px-5">
+                No assets match “{search}”.
+              </p>
+            ) : null}
+          </div>
+          <div className="hidden border-t border-[#f0f1f3] px-5 py-3 text-[11px] text-[#979da5] sm:block">
+            Prices shown are illustrative. Your QuiloxLedger balance is
+            currently ₦0.00.
+          </div>
+        </section>
+      </main>
+
+      <button
+        type="button"
+        aria-label="Contact support"
+        onClick={() => showNotice("Support chat is coming soon.")}
+        className="fixed right-3 z-40 grid h-12 w-12 place-items-center rounded-full bg-[#050607] text-white shadow-lg transition hover:scale-105 active:scale-95 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14"
+        style={{ bottom: "calc(78px + env(safe-area-inset-bottom))" }}
+      >
+        <Icon name="chat" className="h-6 w-6" />
+      </button>
+      {notice ? (
+        <div
+          role="status"
+          className="fixed left-1/2 top-[68px] z-50 -translate-x-1/2 rounded-full bg-[#20252b] px-4 py-2.5 text-xs font-medium text-white shadow-lg sm:top-auto sm:bottom-20"
+        >
+          {notice}
+        </div>
+      ) : null}
+
+      {settingsOpen && user ? (
+        <MobileSettingsSheet
+          user={user}
+          mode="sheet"
+          onClose={closeSettings}
+          onSignOut={handleSignOut}
+          onHideBalanceChange={(hide) => setBalanceVisible(!hide)}
+        />
+      ) : null}
+
+      <MobileWalletNav active="Home" />
     </div>
   );
 }
