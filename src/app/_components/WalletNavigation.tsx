@@ -4,7 +4,7 @@ import Link from "next/link";
 
 const links = [
   { label: "Home", href: "/dashboard", icon: "home" },
-  { label: "Send", href: "/send", icon: "send" },
+  { label: "All Coins", href: "/coins", icon: "coins" },
   { label: "Receive", href: "/receive", icon: "receive" },
   { label: "Swap", href: "/swap", icon: "swap" },
   { label: "Card", href: "/card", icon: "card" },
@@ -29,11 +29,12 @@ function NavIcon({ name }: { name: string }) {
           <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V10Z" />
         </svg>
       );
-    case "send":
+    case "coins":
       return (
         <svg {...props}>
-          <path d="m21 3-7.2 18-3.4-7.4L3 10.2 21 3Z" />
-          <path d="M10.4 13.6 15 9" />
+          <circle cx="8" cy="8" r="5" />
+          <circle cx="16" cy="16" r="5" />
+          <path d="M8 5.5v5m1.5-3.5h-3M16 13.5v5m1.5-3.5h-3" />
         </svg>
       );
     case "receive":

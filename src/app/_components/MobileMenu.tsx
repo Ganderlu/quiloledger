@@ -33,7 +33,7 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen(true)}
-        className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors md:hidden ${
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors xl:hidden ${
           onImage
             ? "border-white/30 text-white hover:bg-white/10"
             : "border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10"
@@ -73,7 +73,7 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
               id={panelId}
               role="dialog"
               aria-modal="true"
-              className="fixed inset-0 z-[1000] md:hidden"
+              className="fixed inset-0 z-[1000] xl:hidden"
             >
               <button
                 type="button"
@@ -149,14 +149,6 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
 
                 <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 overflow-auto px-4 py-8">
                   <nav className="grid gap-2">
-                    <a
-                      href="#markets"
-                      onClick={() => setOpen(false)}
-                      className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base font-semibold text-zinc-950 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white dark:hover:bg-white/5"
-                    >
-                      Markets
-                      <span className="text-zinc-400">→</span>
-                    </a>
                     <Link
                       href="/dashboard"
                       onClick={() => setOpen(false)}
@@ -171,14 +163,6 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
                       className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base font-semibold text-zinc-950 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white dark:hover:bg-white/5"
                     >
                       Features
-                      <span className="text-zinc-400">→</span>
-                    </a>
-                    <a
-                      href="#build"
-                      onClick={() => setOpen(false)}
-                      className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base font-semibold text-zinc-950 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white dark:hover:bg-white/5"
-                    >
-                      Build
                       <span className="text-zinc-400">→</span>
                     </a>
                     <a
@@ -201,14 +185,14 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
 
                   <div className="grid gap-3">
                     <Link
-                      href="/login"
+                      href="/welcome"
                       onClick={() => setOpen(false)}
                       className="inline-flex h-12 items-center justify-center rounded-full border border-zinc-300 px-6 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 dark:border-zinc-800 dark:text-white dark:hover:bg-white/10"
                     >
                       Login
                     </Link>
                     <Link
-                      href="/register"
+                      href="/welcome"
                       onClick={() => setOpen(false)}
                       className="inline-flex h-12 items-center justify-center rounded-full bg-blue-700 px-6 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
                     >
