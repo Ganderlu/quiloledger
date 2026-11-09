@@ -1280,7 +1280,7 @@ export default function Home() {
                   <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
                     <li>
                       <a
-                        href="#support"
+                        href="/help"
                         className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       >
                         Help Center
@@ -1288,7 +1288,7 @@ export default function Home() {
                     </li>
                     <li>
                       <a
-                        href="#support"
+                        href="/contact"
                         className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       >
                         Contact Us
@@ -1296,7 +1296,7 @@ export default function Home() {
                     </li>
                     <li>
                       <a
-                        href="#about"
+                        href="/privacy"
                         className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       >
                         Privacy Policy

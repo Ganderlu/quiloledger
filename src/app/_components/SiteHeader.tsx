@@ -214,7 +214,7 @@ const dropdowns = {
     {
       label: "Help center",
       description: "Guides and product information",
-      href: "/docs",
+      href: "/help",
       icon: "book" as const,
     },
     {
@@ -222,6 +222,12 @@ const dropdowns = {
       description: "Sign in to manage your account",
       href: "/welcome",
       icon: "support" as const,
+    },
+    {
+      label: "Contact us",
+      description: "Send a message to our team",
+      href: "/contact",
+      icon: "login" as const,
     },
   ],
 } as const;

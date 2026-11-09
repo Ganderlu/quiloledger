@@ -165,14 +165,22 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
                       Features
                       <span className="text-zinc-400">→</span>
                     </a>
-                    <a
-                      href="#support"
+                    <Link
+                      href="/help"
                       onClick={() => setOpen(false)}
                       className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base font-semibold text-zinc-950 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white dark:hover:bg-white/5"
                     >
-                      Support
+                      Help Center
                       <span className="text-zinc-400">→</span>
-                    </a>
+                    </Link>
+                    <Link
+                      href="/contact"
+                      onClick={() => setOpen(false)}
+                      className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base font-semibold text-zinc-950 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white dark:hover:bg-white/5"
+                    >
+                      Contact Us
+                      <span className="text-zinc-400">→</span>
+                    </Link>
                     <a
                       href="#about"
                       onClick={() => setOpen(false)}

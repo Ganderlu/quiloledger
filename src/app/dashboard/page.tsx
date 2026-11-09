@@ -1,15 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { CoinLogo } from "../_components/CoinLogo";
 import {
   DesktopWalletNav,
   MobileWalletNav,
 } from "../_components/WalletNavigation";
 import { MobileSettingsSheet } from "../_components/SettingsPanel";
+import { BuyCryptoModal } from "../_components/BuyCryptoModal";
+import {
+  WalletConnectModal,
+  type WalletConnection,
+} from "../_components/WalletConnectModal";
+import {
+  formatMarketPrice,
+  type MarketCoin,
+  type MarketCurrency,
+  type MarketResponse,
+} from "@/lib/market";
 import {
   getStoredBoolean,
   getStoredCurrency,
@@ -18,65 +30,6 @@ import {
   walletPreferencesChangedEvent,
   type WalletCurrency,
 } from "@/lib/wallet-preferences";
-
-const assets = [
-  {
-    name: "Aerodrome Finance",
-    ticker: "AERO",
-    price: "₦1,131.85",
-    change: "+2.30%",
-    up: true,
-    icon: "aero",
-  },
-  {
-    name: "Bitcoin",
-    ticker: "BTC",
-    price: "₦91,305,895.85",
-    change: "-0.18%",
-    up: false,
-    icon: "btc",
-  },
-  {
-    name: "Bitcoin Cash",
-    ticker: "BCH",
-    price: "₦43,374.20",
-    change: "-0.20%",
-    up: false,
-    icon: "bch",
-  },
-  {
-    name: "BNB",
-    ticker: "BNB",
-    price: "₦1,007,901.60",
-    change: "-0.07%",
-    up: false,
-    icon: "bnb",
-  },
-  {
-    name: "Cardano",
-    ticker: "ADA",
-    price: "₦1,042.48",
-    change: "+0.54%",
-    up: true,
-    icon: "ada",
-  },
-  {
-    name: "Ethereum",
-    ticker: "ETH",
-    price: "₦3,246,820.00",
-    change: "+1.12%",
-    up: true,
-    icon: "eth",
-  },
-  {
-    name: "Solana",
-    ticker: "SOL",
-    price: "₦218,460.50",
-    change: "-0.36%",
-    up: false,
-    icon: "sol",
-  },
-] as const;
 
 function Icon({
   name,
@@ -182,62 +135,33 @@ function Icon({
   }
 }
 
-function AssetIcon({ kind }: { kind: (typeof assets)[number]["icon"] }) {
-  if (kind === "aero") {
-    return (
-      <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#eef3ff]">
-        <span className="absolute h-5 w-5 -rotate-45 rounded-full border-[2px] border-b-transparent border-r-transparent border-blue-500" />
-        <span className="absolute h-4 w-4 rotate-45 rounded-full border-[2px] border-l-transparent border-t-transparent border-red-500" />
-      </span>
-    );
-  }
-  const styles = {
-    btc: "bg-[#f7931a] text-white",
-    bch: "bg-[#82bd45] text-white",
-    bnb: "bg-[#f0b90b] text-white",
-    ada: "bg-[#edf4ff] text-[#2869db]",
-    eth: "bg-[#edf0ff] text-[#5265b8]",
-    sol: "bg-[#17152e] text-white",
-  };
-  const symbols = {
-    btc: "₿",
-    bch: "₿",
-    bnb: "◆",
-    ada: "⠿",
-    eth: "♦",
-    sol: "≋",
-  };
-  return (
-    <span
-      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-xl font-bold ${styles[kind]}`}
-    >
-      {symbols[kind]}
-    </span>
-  );
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [search, setSearch] = useState("");
+  const [coins, setCoins] = useState<MarketCoin[]>([]);
+  const [marketLoading, setMarketLoading] = useState(true);
+  const [marketError, setMarketError] = useState("");
+  const [marketUpdatedAt, setMarketUpdatedAt] = useState("");
+  const [marketRefresh, setMarketRefresh] = useState(0);
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [notice, setNotice] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [walletConnectOpen, setWalletConnectOpen] = useState(false);
+  const [buyCryptoOpen, setBuyCryptoOpen] = useState(false);
+  const [walletConnection, setWalletConnection] =
+    useState<WalletConnection | null>(null);
   const [currency, setCurrency] = useState<WalletCurrency>("NGN");
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
-
-  const filteredAssets = useMemo(
-    () =>
-      assets.filter((asset) =>
-        `${asset.name} ${asset.ticker}`
-          .toLowerCase()
-          .includes(search.toLowerCase()),
-      ),
-    [search],
+  const closeWalletConnect = useCallback(() => setWalletConnectOpen(false), []);
+  const closeBuyCrypto = useCallback(() => setBuyCryptoOpen(false), []);
+  const handleWalletConnectionChange = useCallback(
+    (connection: WalletConnection | null) => setWalletConnection(connection),
+    [],
   );
 
   function showNotice(message: string) {
@@ -274,6 +198,85 @@ export default function DashboardPage() {
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      const stored: unknown = JSON.parse(
+        localStorage.getItem("qlx-wallet-connection") ?? "null",
+      );
+      if (
+        typeof stored === "object" &&
+        stored !== null &&
+        "address" in stored &&
+        typeof stored.address === "string" &&
+        "chainId" in stored &&
+        typeof stored.chainId === "string" &&
+        "chainName" in stored &&
+        typeof stored.chainName === "string" &&
+        "nativeSymbol" in stored &&
+        typeof stored.nativeSymbol === "string" &&
+        "nativeBalance" in stored &&
+        typeof stored.nativeBalance === "string" &&
+        "walletName" in stored &&
+        typeof stored.walletName === "string"
+      ) {
+        setWalletConnection(stored as WalletConnection);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      async () => {
+        setMarketLoading(true);
+        setMarketError("");
+        try {
+          const params = new URLSearchParams({
+            currency: currency.toLowerCase(),
+          });
+          if (search.trim()) params.set("query", search.trim());
+
+          const response = await fetch(`/api/market?${params.toString()}`, {
+            signal: controller.signal,
+          });
+          const payload = (await response.json()) as
+            | MarketResponse
+            | { error?: string };
+          if (!response.ok || !("coins" in payload)) {
+            throw new Error(
+              "error" in payload
+                ? payload.error
+                : "Live market data is temporarily unavailable.",
+            );
+          }
+
+          setCoins(payload.coins);
+          setMarketUpdatedAt(payload.updatedAt);
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+          setMarketError(
+            error instanceof Error
+              ? error.message
+              : "Live market data is temporarily unavailable.",
+          );
+        } finally {
+          if (!controller.signal.aborted) {
+            setMarketLoading(false);
+            setRefreshing(false);
+          }
+        }
+      },
+      search.trim() ? 350 : 0,
+    );
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [currency, marketRefresh, search]);
+
   function openSettings() {
     if (window.matchMedia("(max-width: 767px)").matches) {
       setSettingsOpen(true);
@@ -293,11 +296,9 @@ export default function DashboardPage() {
     router.replace("/login");
   }
 
-  async function refreshMarket() {
+  function refreshMarket() {
     setRefreshing(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 500));
-    setRefreshing(false);
-    showNotice("Market preview refreshed.");
+    setMarketRefresh((value) => value + 1);
   }
 
   if (checking) {
@@ -476,9 +477,7 @@ export default function DashboardPage() {
             <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-4">
               <button
                 type="button"
-                onClick={() =>
-                  showNotice("Wallet connections are not available yet.")
-                }
+                onClick={() => setWalletConnectOpen(true)}
                 className="group min-h-[130px] rounded-[10px] bg-[#f0f0f0] px-3.5 py-3 text-left transition hover:bg-[#e9edf2] active:scale-[0.99] sm:min-h-[170px] sm:rounded-2xl sm:px-6 sm:py-5"
               >
                 <span className="mx-auto mb-2 grid h-8 w-10 place-items-center text-[#2895f5] sm:mb-3 sm:h-10 sm:w-12">
@@ -500,21 +499,22 @@ export default function DashboardPage() {
                   </svg>
                 </span>
                 <span className="block text-[11px] font-medium leading-4 text-[#30353b] sm:text-base sm:leading-5">
-                  Connect Wallet
+                  {walletConnection
+                    ? `${walletConnection.walletName} connected`
+                    : "Connect Wallet"}
                 </span>
                 <span className="mt-1 block text-[10px] leading-[1.35] text-[#737980] sm:text-sm sm:leading-5">
-                  Connect Trust, MetaMask and other wallets when wallet linking
-                  is available.
+                  {walletConnection
+                    ? `${walletConnection.address.slice(0, 6)}…${walletConnection.address.slice(-4)} · ${walletConnection.chainName}`
+                    : "Connect MetaMask, Trust Wallet, Coinbase Wallet and other installed wallets."}
                 </span>
                 <span className="mt-1.5 block text-[11px] font-medium text-[#0877d1] sm:mt-2 sm:text-sm">
-                  Connect Now →
+                  {walletConnection ? "Manage Wallet →" : "Connect Now →"}
                 </span>
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  showNotice("Crypto purchases are not available yet.")
-                }
+                onClick={() => setBuyCryptoOpen(true)}
                 className="group min-h-[130px] rounded-[10px] bg-[#f0f0f0] px-3.5 py-3 text-left transition hover:bg-[#e9edf2] active:scale-[0.99] sm:min-h-[170px] sm:rounded-2xl sm:px-6 sm:py-5"
               >
                 <span className="mx-auto mb-2 grid h-8 w-10 place-items-center text-[#075b9d] sm:mb-3 sm:h-10 sm:w-12">
@@ -524,7 +524,7 @@ export default function DashboardPage() {
                   Buy Crypto
                 </span>
                 <span className="mt-1 block text-[10px] leading-[1.35] text-[#737980] sm:text-sm sm:leading-5">
-                  Purchase directly using Credit Card
+                  Get a live quote and continue through MoonPay checkout.
                 </span>
                 <span className="mt-1.5 block text-[11px] font-medium text-[#0877d1] sm:mt-2 sm:text-sm">
                   Buy Now →
@@ -601,7 +601,7 @@ export default function DashboardPage() {
             <div className="hidden sm:block">
               <h2 className="text-base font-bold text-[#30363d]">Market</h2>
               <p className="mt-1 text-xs text-[#9197a0]">
-                Popular digital assets · demo prices
+                Top 50 cryptocurrencies by market capitalization
               </p>
             </div>
             <label className="mt-1 flex h-[34px] items-center gap-2.5 rounded-full border border-[#e8e9eb] bg-[#f7f7f7] px-3.5 sm:mt-0 sm:h-10 sm:w-[320px] sm:bg-white">
@@ -613,11 +613,23 @@ export default function DashboardPage() {
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search"
-                aria-label="Search assets"
+                placeholder="Search any cryptocurrency"
+                aria-label="Search any cryptocurrency"
                 className="h-full min-w-0 flex-1 bg-transparent text-xs text-[#333a41] outline-none placeholder:text-[#7a7e83] sm:text-sm"
               />
             </label>
+          </div>
+          <div className="flex items-center justify-between border-t border-[#f0f1f3] px-4 py-2.5 text-[10px] text-[#89919a] sm:px-5">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#20a95a]" />
+              Live market data · {coins.length}{" "}
+              {coins.length === 1 ? "asset" : "assets"}
+            </span>
+            <span>
+              {marketUpdatedAt
+                ? `Updated ${new Date(marketUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                : "Prices may be delayed"}
+            </span>
           </div>
           <div className="hidden grid-cols-[minmax(240px,1fr)_160px_130px] border-y border-[#f0f1f3] px-5 py-3 text-[10px] font-semibold uppercase tracking-[.12em] text-[#9aa0a8] md:grid">
             <span>Asset</span>
@@ -625,56 +637,93 @@ export default function DashboardPage() {
             <span className="text-right">24h change</span>
           </div>
           <div className="divide-y divide-[#f1f2f3]">
-            {filteredAssets.map((asset) => (
-              <div
-                key={asset.ticker}
-                className="grid min-h-[62px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-0 py-2 sm:px-5 md:grid-cols-[minmax(240px,1fr)_160px_130px] md:py-3.5"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <AssetIcon kind={asset.icon} />
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-medium leading-5 text-[#3d4146] sm:text-sm">
-                      {asset.name}
+            {coins.map((coin) => {
+              const change = coin.price_change_percentage_24h;
+              const positive = (change ?? 0) >= 0;
+              const coinCurrency = currency.toLowerCase() as MarketCurrency;
+              return (
+                <Link
+                  key={coin.id}
+                  href={`/coin/${encodeURIComponent(coin.id)}`}
+                  aria-label={`${coin.name} price details`}
+                  className="grid min-h-[66px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[#fafcfd] active:bg-[#f2f6f8] sm:px-5 md:grid-cols-[minmax(240px,1fr)_160px_130px] md:py-3.5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <CoinLogo
+                      src={coin.image}
+                      name={coin.name}
+                      symbol={coin.symbol}
+                      size={38}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-semibold leading-5 text-[#3d4146] sm:text-sm">
+                        {coin.name}
+                      </p>
+                      <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[#94999f] sm:text-[11px]">
+                        {coin.symbol}
+                        {coin.market_cap_rank
+                          ? ` · Rank #${coin.market_cap_rank}`
+                          : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right md:hidden">
+                    <p className="text-[12px] font-semibold leading-5 tabular-nums text-[#40454a]">
+                      {formatMarketPrice(coin.current_price, coinCurrency)}
                     </p>
-                    <p className="mt-0.5 text-[9px] leading-3 text-[#94999f] sm:text-[11px]">
-                      {asset.price}{" "}
-                      <span
-                        className={
-                          asset.up ? "text-[#20a95a]" : "text-[#eb535a]"
-                        }
-                      >
-                        {asset.change}
-                      </span>
+                    <p
+                      className={`mt-0.5 text-[10px] font-semibold tabular-nums ${
+                        positive ? "text-[#20a95a]" : "text-[#e35a60]"
+                      }`}
+                    >
+                      {change == null
+                        ? "Change unavailable"
+                        : `${positive ? "+" : ""}${change.toFixed(2)}%`}
                     </p>
                   </div>
-                </div>
-                <div className="text-right md:hidden">
-                  <p className="text-[13px] font-semibold leading-5 text-[#40454a]">
-                    0 {asset.ticker}
+                  <p className="hidden text-right text-sm font-medium tabular-nums text-[#454b52] md:block">
+                    {formatMarketPrice(coin.current_price, coinCurrency)}
                   </p>
-                  <p className="mt-0.5 text-[9px] leading-3 text-[#93999f]">
-                    ₦0
+                  <p
+                    className={`hidden text-right text-sm font-medium tabular-nums md:block ${positive ? "text-[#20a95a]" : "text-[#e35a60]"}`}
+                  >
+                    {change == null
+                      ? "—"
+                      : `${positive ? "+" : ""}${change.toFixed(2)}%`}
                   </p>
-                </div>
-                <p className="hidden text-right text-sm font-medium text-[#454b52] md:block">
-                  {asset.price}
-                </p>
-                <p
-                  className={`hidden text-right text-sm font-medium md:block ${asset.up ? "text-[#20a95a]" : "text-[#e35a60]"}`}
-                >
-                  {asset.change}
-                </p>
+                </Link>
+              );
+            })}
+            {marketLoading && coins.length === 0 ? (
+              <div className="px-4 py-12 text-center text-sm text-[#7c838b] sm:px-5">
+                Loading live cryptocurrency prices…
               </div>
-            ))}
-            {filteredAssets.length === 0 ? (
+            ) : null}
+            {marketError ? (
+              <div
+                role="alert"
+                className="mx-3 my-3 rounded-xl border border-[#f0d8cf] bg-[#fff8f5] px-4 py-3 text-xs leading-5 text-[#955340] sm:mx-5"
+              >
+                <p>{marketError}</p>
+                <button
+                  type="button"
+                  onClick={refreshMarket}
+                  className="mt-1 font-semibold underline underline-offset-2"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : null}
+            {!marketLoading && !marketError && coins.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-[#7c838b] sm:px-5">
-                No assets match “{search}”.
+                No listed cryptocurrency matches “{search}”. Try its full name
+                or ticker symbol.
               </p>
             ) : null}
           </div>
           <div className="hidden border-t border-[#f0f1f3] px-5 py-3 text-[11px] text-[#979da5] sm:block">
-            Prices shown are illustrative. Your QuiloxLedger balance is
-            currently ₦0.00.
+            Market prices are provided by CoinGecko and may be delayed. They are
+            informational only; your wallet holdings are shown separately.
           </div>
         </section>
       </main>
@@ -706,6 +755,25 @@ export default function DashboardPage() {
           onHideBalanceChange={(hide) => setBalanceVisible(!hide)}
         />
       ) : null}
+
+      <WalletConnectModal
+        open={walletConnectOpen}
+        onClose={closeWalletConnect}
+        connection={walletConnection}
+        onConnectionChange={handleWalletConnectionChange}
+      />
+      <BuyCryptoModal
+        open={buyCryptoOpen}
+        onClose={closeBuyCrypto}
+        currency={currency}
+        coins={coins}
+        walletConnection={walletConnection}
+        onPurchaseCompleted={() =>
+          showNotice(
+            "MoonPay reports the purchase completed. Verify the deposit in your wallet; balance sync is not connected yet.",
+          )
+        }
+      />
 
       <MobileWalletNav active="Home" />
     </div>
