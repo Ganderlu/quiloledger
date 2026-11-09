@@ -272,10 +272,12 @@ export function SiteHeader() {
   if (
     pathname === "/dashboard" ||
     pathname === "/coins" ||
+    pathname === "/markets" ||
     pathname === "/login" ||
     pathname === "/register" ||
     pathname === "/welcome" ||
     pathname === "/card" ||
+    pathname === "/trade" ||
     pathname === "/swap" ||
     pathname === "/settings" ||
     pathname === "/send" ||
@@ -302,7 +304,7 @@ export function SiteHeader() {
           : "sticky top-0 border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-black/60"
       }`}
     >
-      <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-none items-center gap-2 px-4 sm:px-6 lg:h-20 lg:gap-3 lg:px-8 xl:gap-4">
         <Link href="/" className="flex items-center gap-2">
           <span
             aria-hidden="true"
@@ -332,8 +334,18 @@ export function SiteHeader() {
         <nav
           ref={navRef}
           aria-label="Main navigation"
-          className="hidden flex-1 items-center justify-center gap-1 text-sm font-medium xl:flex"
+          className="hidden flex-1 items-center justify-between gap-0 text-sm font-medium lg:flex xl:justify-center xl:gap-1"
         >
+          <Link
+            href="/"
+            className={`inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-1.5 transition-colors hover:bg-white/10 xl:gap-2 xl:px-3 ${
+              isHome ? "text-emerald-500 hover:text-emerald-400" : navLink
+            }`}
+          >
+            <HeaderIcon name="home" />
+            <span>Home</span>
+          </Link>
+
           {(["Wallet", "Features"] as const).map((label) => {
             const expanded = openDropdown === label;
             return (
@@ -343,7 +355,7 @@ export function SiteHeader() {
                   aria-haspopup="menu"
                   aria-expanded={expanded}
                   onClick={() => setOpenDropdown(expanded ? null : label)}
-                  className={`group inline-flex h-10 items-center gap-2 rounded-full px-3 transition-colors hover:bg-white/10 ${
+                  className={`group inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-1.5 transition-colors hover:bg-white/10 xl:gap-2 xl:px-3 ${
                     navLink
                   }`}
                 >
@@ -388,9 +400,17 @@ export function SiteHeader() {
             );
           })}
 
+          <Link
+            href="/coins"
+            className={`inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-1.5 transition-colors hover:bg-white/10 xl:gap-2 xl:px-3 ${navLink}`}
+          >
+            <HeaderIcon name="explorer" />
+            <span>Explorer</span>
+          </Link>
+
           <a
             href="#about"
-            className={`inline-flex h-10 items-center gap-2 rounded-full px-3 transition-colors hover:bg-white/10 ${navLink}`}
+            className={`inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-1.5 transition-colors hover:bg-white/10 xl:gap-2 xl:px-3 ${navLink}`}
           >
             <HeaderIcon name="about" />
             <span>About Us</span>
@@ -404,7 +424,7 @@ export function SiteHeader() {
               onClick={() =>
                 setOpenDropdown(openDropdown === "Support" ? null : "Support")
               }
-              className={`inline-flex h-10 items-center gap-2 rounded-full px-3 transition-colors hover:bg-white/10 ${navLink}`}
+              className={`inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-1.5 transition-colors hover:bg-white/10 xl:gap-2 xl:px-3 ${navLink}`}
             >
               <HeaderIcon name="support" />
               <span>Support</span>
@@ -445,28 +465,24 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-          <ThemeToggle onImage={overImage} />
+          {!isHome ? <ThemeToggle onImage={overImage} /> : null}
           <button
             type="button"
-            className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors ${
+            aria-label="Language"
+            className={`inline-flex h-10 items-center gap-2 rounded-full border px-2 text-sm font-medium transition-colors xl:px-4 ${
               overImage
                 ? "border-white/30 text-white hover:bg-white/10"
                 : "border-blue-500 text-blue-700 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-white/10"
             }`}
           >
             <HeaderIcon name="globe" className="h-4 w-4" />
-            <span className="hidden sm:inline">Language</span>
+            {!isHome ? (
+              <span className="hidden sm:inline">Language</span>
+            ) : null}
           </button>
           <Link
             href="/welcome"
-            className={`hidden h-10 items-center justify-center rounded-full border px-5 text-sm font-semibold transition-colors sm:inline-flex ${outlineAction}`}
-          >
-            <HeaderIcon name="login" className="h-4 w-4" />
-            <span>Log In</span>
-          </Link>
-          <Link
-            href="/welcome"
-            className={`hidden h-10 items-center justify-center rounded-full px-5 text-sm font-semibold shadow-sm transition-colors sm:inline-flex ${
+            className={`hidden h-10 items-center justify-center rounded-full px-2 text-sm font-semibold shadow-sm transition-colors sm:inline-flex lg:order-3 lg:px-3 xl:px-5 ${
               overImage
                 ? "bg-white text-blue-800 hover:bg-white/90"
                 : "bg-blue-700 text-white hover:bg-blue-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
@@ -474,6 +490,13 @@ export function SiteHeader() {
           >
             <HeaderIcon name="signup" className="h-4 w-4" />
             <span>Sign Up</span>
+          </Link>
+          <Link
+            href="/welcome"
+            className={`hidden h-10 items-center justify-center rounded-full border px-2 text-sm font-semibold transition-colors sm:inline-flex lg:order-4 lg:px-3 xl:px-5 ${outlineAction}`}
+          >
+            <HeaderIcon name="login" className="h-4 w-4" />
+            <span>Log In</span>
           </Link>
           <MobileMenu onImage={overImage} />
         </div>

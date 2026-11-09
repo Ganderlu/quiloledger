@@ -510,7 +510,7 @@ function StarIcon({ filled }: { filled: boolean }) {
 export default function CoinsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [checking] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] =
     useState<(typeof categories)[number]>("All coins");
@@ -523,11 +523,12 @@ export default function CoinsPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
+        setUser(null);
         router.replace("/login");
         return;
       }
       setUser(currentUser);
-      setChecking(false);
+      router.replace("/markets");
     });
     return () => unsubscribe();
   }, [router]);

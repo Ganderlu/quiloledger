@@ -33,7 +33,7 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen(true)}
-        className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors xl:hidden ${
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors lg:hidden ${
           onImage
             ? "border-white/30 text-white hover:bg-white/10"
             : "border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10"
@@ -73,7 +73,7 @@ export function MobileMenu({ onImage = false }: { onImage?: boolean }) {
               id={panelId}
               role="dialog"
               aria-modal="true"
-              className="fixed inset-0 z-[1000] xl:hidden"
+              className="fixed inset-0 z-[1000] lg:hidden"
             >
               <button
                 type="button"

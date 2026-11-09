@@ -19,7 +19,7 @@ type WalletProviderInfo = {
   rdns?: string;
 };
 
-type BrowserWalletProvider = {
+export type BrowserWalletProvider = {
   request<T = unknown>(args: {
     method: string;
     params?: unknown[];
@@ -136,11 +136,13 @@ export function WalletConnectModal({
   onClose,
   connection,
   onConnectionChange,
+  onProviderChange,
 }: {
   open: boolean;
   onClose: () => void;
   connection: WalletConnection | null;
   onConnectionChange: (connection: WalletConnection | null) => void;
+  onProviderChange?: (provider: BrowserWalletProvider | null) => void;
 }) {
   const [wallets, setWallets] = useState<DiscoveredWallet[]>([]);
   const [connecting, setConnecting] = useState("");
@@ -288,10 +290,11 @@ export function WalletConnectModal({
         activeProvider.current = wallet.provider;
         activeWalletName.current = wallet.info.name;
         connectedAddress.current = accounts[0];
+        onProviderChange?.(wallet.provider);
         void refreshConnectionRef.current();
       })
       .catch(() => publishConnection(null));
-  }, [connection, open, publishConnection, wallets]);
+  }, [connection, onProviderChange, open, publishConnection, wallets]);
 
   useEffect(() => {
     if (!open) return;
@@ -315,6 +318,7 @@ export function WalletConnectModal({
       const accounts = Array.isArray(value) ? value : [];
       if (typeof accounts[0] !== "string") {
         connectedAddress.current = "";
+        onProviderChange?.(null);
         publishConnection(null);
         return;
       }
@@ -325,6 +329,7 @@ export function WalletConnectModal({
     const handleDisconnect = () => {
       connectedAddress.current = "";
       activeProvider.current = null;
+      onProviderChange?.(null);
       publishConnection(null);
     };
     const listeners = [
@@ -340,7 +345,12 @@ export function WalletConnectModal({
         provider.removeListener?.(event, listener),
       );
     };
-  }, [connection?.address, connection?.chainId, publishConnection]);
+  }, [
+    connection?.address,
+    connection?.chainId,
+    onProviderChange,
+    publishConnection,
+  ]);
 
   async function connectWallet(wallet: DiscoveredWallet) {
     setError("");
@@ -355,6 +365,7 @@ export function WalletConnectModal({
       activeProvider.current = wallet.provider;
       activeWalletName.current = wallet.info.name;
       connectedAddress.current = address;
+      onProviderChange?.(wallet.provider);
       await refreshConnectionRef.current();
       setError("");
     } catch (connectError) {
@@ -433,6 +444,7 @@ export function WalletConnectModal({
     activeProvider.current = null;
     activeWalletName.current = "";
     connectedAddress.current = "";
+    onProviderChange?.(null);
     setError("");
     publishConnection(null);
   }

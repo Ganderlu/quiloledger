@@ -5,7 +5,7 @@ import Link from "next/link";
 const links = [
   { label: "Home", href: "/dashboard", icon: "home" },
   { label: "All Coins", href: "/coins", icon: "coins" },
-  { label: "Receive", href: "/receive", icon: "receive" },
+  { label: "Trade", href: "/trade", icon: "trade" },
   { label: "Swap", href: "/swap", icon: "swap" },
   { label: "Card", href: "/card", icon: "card" },
 ] as const;
@@ -37,10 +37,10 @@ function NavIcon({ name }: { name: string }) {
           <path d="M8 5.5v5m1.5-3.5h-3M16 13.5v5m1.5-3.5h-3" />
         </svg>
       );
-    case "receive":
+    case "trade":
       return (
         <svg {...props}>
-          <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3" />
+          <path d="M4 18V9m5 9V5m5 13v-6m5 6V7M3 20h18" />
         </svg>
       );
     case "swap":
