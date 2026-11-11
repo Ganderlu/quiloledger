@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { CoinLogo } from "../_components/CoinLogo";
 import {
   MobileWalletNav,
   WalletPageHeader,
@@ -14,8 +15,15 @@ import {
   walletPreferencesChangedEvent,
   type WalletCurrency,
 } from "@/lib/wallet-preferences";
+import {
+  formatMarketPrice,
+  type MarketCoin,
+  type MarketCurrency,
+  type MarketResponse,
+} from "@/lib/market";
 
 type CoinCategory =
+  | "All"
   | "Layer 1"
   | "Stablecoin"
   | "DeFi"
@@ -23,470 +31,230 @@ type CoinCategory =
   | "Infrastructure"
   | "Gaming";
 
-type Coin = {
-  name: string;
-  symbol: string;
-  priceNgn: number;
-  change: number;
-  category: CoinCategory;
-  mark: string;
+type SortOption =
+  | "rank"
+  | "name"
+  | "price-desc"
+  | "price-asc"
+  | "change-desc"
+  | "change-asc"
+  | "volume-desc";
+
+const watchlistKey = "qlx-coins-watchlist";
+
+const categoryMap: Record<string, Exclude<CoinCategory, "All">> = {
+  // Layer 1
+  bitcoin: "Layer 1",
+  ethereum: "Layer 1",
+  binancecoin: "Layer 1",
+  solana: "Layer 1",
+  cardano: "Layer 1",
+  "avalanche-2": "Layer 1",
+  polkadot: "Layer 1",
+  litecoin: "Layer 1",
+  "bitcoin-cash": "Layer 1",
+  stellar: "Layer 1",
+  cosmos: "Layer 1",
+  aptos: "Layer 1",
+  sui: "Layer 1",
+  sei: "Layer 1",
+  near: "Layer 1",
+  "internet-computer": "Layer 1",
+  fantom: "Layer 1",
+  algorand: "Layer 1",
+  flow: "Layer 1",
+  tezos: "Layer 1",
+  tron: "Layer 1",
+  kava: "Layer 1",
+  cronos: "Layer 1",
+  vechain: "Layer 1",
+  hedera: "Layer 1",
+  "the-open-network": "Layer 1",
+  arbitrum: "Layer 1",
+  optimism: "Layer 1",
+  "ethereum-classic": "Layer 1",
+  monero: "Layer 1",
+  zcash: "Layer 1",
+  dash: "Layer 1",
+  nem: "Layer 1",
+  eos: "Layer 1",
+  neo: "Layer 1",
+  waves: "Layer 1",
+  nano: "Layer 1",
+  iota: "Layer 1",
+  qtum: "Layer 1",
+  "icon-icx": "Layer 1",
+  zilliqa: "Layer 1",
+  "kucoin-shares": "Layer 1",
+  okb: "Layer 1",
+  mxc: "Layer 1",
+  gmx: "Layer 1",
+
+  // Stablecoins
+  tether: "Stablecoin",
+  "usd-coin": "Stablecoin",
+  dai: "Stablecoin",
+  "binance-usd": "Stablecoin",
+  "true-usd": "Stablecoin",
+  usdd: "Stablecoin",
+  frax: "Stablecoin",
+  "paxos-standard": "Stablecoin",
+  fdusd: "Stablecoin",
+  "first-digital-usd": "Stablecoin",
+  liquityusd: "Stablecoin",
+  "gemini-dollar": "Stablecoin",
+  usdk: "Stablecoin",
+  "stasis-eurs": "Stablecoin",
+  "tether-gold": "Stablecoin",
+  "paypal-usd": "Stablecoin",
+
+  // DeFi
+  uniswap: "DeFi",
+  chainlink: "DeFi",
+  aave: "DeFi",
+  "lido-dao": "DeFi",
+  "the-graph": "DeFi",
+  "curve-dao-token": "DeFi",
+  "compound-governance-token": "DeFi",
+  pancakeswap: "DeFi",
+  dydx: "DeFi",
+  "1inch": "DeFi",
+  "convex-finance": "DeFi",
+  pendle: "DeFi",
+  "rocket-pool": "DeFi",
+  balancer: "DeFi",
+  "synthetix-network-token": "DeFi",
+  bancor: "DeFi",
+  sushiswap: "DeFi",
+  "yearn-finance": "DeFi",
+  "spell-token": "DeFi",
+  looksrare: "DeFi",
+  x2y2: "DeFi",
+  "badger-dao": "DeFi",
+  keep3rv1: "DeFi",
+  ren: "DeFi",
+  "origin-protocol": "DeFi",
+  ankr: "DeFi",
+  "ethereum-name-service": "DeFi",
+
+  // Meme
+  dogecoin: "Meme",
+  "shiba-inu": "Meme",
+  pepe: "Meme",
+  bonk: "Meme",
+  dogwifhat: "Meme",
+  floki: "Meme",
+  "baby-doge-coin": "Meme",
+  memecoin: "Meme",
+  akita: "Meme",
+  "kishu-inu": "Meme",
+  samoyedcoin: "Meme",
+  bittorrent: "Meme",
+  "dogelon-mars": "Meme",
+  "shib-2": "Meme",
+  catecoin: "Meme",
+
+  // Infrastructure
+  filecoin: "Infrastructure",
+  arweave: "Infrastructure",
+  helium: "Infrastructure",
+  "render-token": "Infrastructure",
+  "fetch-ai": "Infrastructure",
+  singularitynet: "Infrastructure",
+  "ocean-protocol": "Infrastructure",
+  "akash-network": "Infrastructure",
+  livepeer: "Infrastructure",
+  "theta-token": "Infrastructure",
+  "theta-fuel": "Infrastructure",
+  celestia: "Infrastructure",
+  bundlr: "Infrastructure",
+  bittensor: "Infrastructure",
+  render: "Infrastructure",
+  hive: "Infrastructure",
+  kaspa: "Infrastructure",
+
+  // Gaming
+  "the-sandbox": "Gaming",
+  decentraland: "Gaming",
+  "axie-infinity": "Gaming",
+  gala: "Gaming",
+  illuvium: "Gaming",
+  "enjin-coin": "Gaming",
+  magic: "Gaming",
+  apecoin: "Gaming",
+  stepn: "Gaming",
+  ronin: "Gaming",
+  beam: "Gaming",
+  "gods-unchained": "Gaming",
+  "merit-circle": "Gaming",
+  "yield-guild-games": "Gaming",
+  ultra: "Gaming",
 };
 
-const coins: Coin[] = [
-  {
-    name: "Bitcoin",
-    symbol: "BTC",
-    priceNgn: 91305895.85,
-    change: 1.82,
-    category: "Layer 1",
-    mark: "₿",
-  },
-  {
-    name: "Ethereum",
-    symbol: "ETH",
-    priceNgn: 3246820,
-    change: 2.46,
-    category: "Layer 1",
-    mark: "◆",
-  },
-  {
-    name: "Tether",
-    symbol: "USDT",
-    priceNgn: 1498,
-    change: 0.04,
-    category: "Stablecoin",
-    mark: "₮",
-  },
-  {
-    name: "BNB",
-    symbol: "BNB",
-    priceNgn: 1007901.6,
-    change: -0.32,
-    category: "Layer 1",
-    mark: "◆",
-  },
-  {
-    name: "XRP",
-    symbol: "XRP",
-    priceNgn: 3420.5,
-    change: 1.14,
-    category: "Layer 1",
-    mark: "✕",
-  },
-  {
-    name: "USD Coin",
-    symbol: "USDC",
-    priceNgn: 1496,
-    change: -0.02,
-    category: "Stablecoin",
-    mark: "$",
-  },
-  {
-    name: "Solana",
-    symbol: "SOL",
-    priceNgn: 218460.5,
-    change: 3.28,
-    category: "Layer 1",
-    mark: "≋",
-  },
-  {
-    name: "TRON",
-    symbol: "TRX",
-    priceNgn: 465.2,
-    change: 0.64,
-    category: "Layer 1",
-    mark: "△",
-  },
-  {
-    name: "Dogecoin",
-    symbol: "DOGE",
-    priceNgn: 235.6,
-    change: -1.25,
-    category: "Meme",
-    mark: "Ð",
-  },
-  {
-    name: "Cardano",
-    symbol: "ADA",
-    priceNgn: 1042.48,
-    change: 0.88,
-    category: "Layer 1",
-    mark: "₳",
-  },
-  {
-    name: "Toncoin",
-    symbol: "TON",
-    priceNgn: 8200,
-    change: 2.02,
-    category: "Layer 1",
-    mark: "◇",
-  },
-  {
-    name: "Chainlink",
-    symbol: "LINK",
-    priceNgn: 18450,
-    change: 1.76,
-    category: "Infrastructure",
-    mark: "⬡",
-  },
-  {
-    name: "Avalanche",
-    symbol: "AVAX",
-    priceNgn: 52300,
-    change: -0.72,
-    category: "Layer 1",
-    mark: "▲",
-  },
-  {
-    name: "Shiba Inu",
-    symbol: "SHIB",
-    priceNgn: 0.038,
-    change: 2.91,
-    category: "Meme",
-    mark: "S",
-  },
-  {
-    name: "Bitcoin Cash",
-    symbol: "BCH",
-    priceNgn: 43374.2,
-    change: -0.2,
-    category: "Layer 1",
-    mark: "Ƀ",
-  },
-  {
-    name: "Polkadot",
-    symbol: "DOT",
-    priceNgn: 10800,
-    change: 0.52,
-    category: "Layer 1",
-    mark: "●",
-  },
-  {
-    name: "Litecoin",
-    symbol: "LTC",
-    priceNgn: 148000,
-    change: 0.37,
-    category: "Layer 1",
-    mark: "Ł",
-  },
-  {
-    name: "Dai",
-    symbol: "DAI",
-    priceNgn: 1497,
-    change: 0.01,
-    category: "Stablecoin",
-    mark: "◈",
-  },
-  {
-    name: "NEAR Protocol",
-    symbol: "NEAR",
-    priceNgn: 5120,
-    change: 3.14,
-    category: "Layer 1",
-    mark: "Ⓝ",
-  },
-  {
-    name: "Uniswap",
-    symbol: "UNI",
-    priceNgn: 15400,
-    change: 1.58,
-    category: "DeFi",
-    mark: "U",
-  },
-  {
-    name: "Stellar",
-    symbol: "XLM",
-    priceNgn: 520,
-    change: 0.48,
-    category: "Layer 1",
-    mark: "*",
-  },
-  {
-    name: "Cosmos",
-    symbol: "ATOM",
-    priceNgn: 7240,
-    change: -0.45,
-    category: "Layer 1",
-    mark: "✳",
-  },
-  {
-    name: "Ethereum Classic",
-    symbol: "ETC",
-    priceNgn: 23800,
-    change: 0.63,
-    category: "Layer 1",
-    mark: "Ξ",
-  },
-  {
-    name: "Internet Computer",
-    symbol: "ICP",
-    priceNgn: 12150,
-    change: 2.25,
-    category: "Infrastructure",
-    mark: "∞",
-  },
-  {
-    name: "Filecoin",
-    symbol: "FIL",
-    priceNgn: 6490,
-    change: -1.02,
-    category: "Infrastructure",
-    mark: "F",
-  },
-  {
-    name: "Aptos",
-    symbol: "APT",
-    priceNgn: 13600,
-    change: 1.32,
-    category: "Layer 1",
-    mark: "A",
-  },
-  {
-    name: "Hedera",
-    symbol: "HBAR",
-    priceNgn: 178,
-    change: 0.91,
-    category: "Layer 1",
-    mark: "ℏ",
-  },
-  {
-    name: "Arbitrum",
-    symbol: "ARB",
-    priceNgn: 1060,
-    change: 1.03,
-    category: "Layer 1",
-    mark: "A",
-  },
-  {
-    name: "Optimism",
-    symbol: "OP",
-    priceNgn: 2250,
-    change: 0.74,
-    category: "Layer 1",
-    mark: "O",
-  },
-  {
-    name: "Cronos",
-    symbol: "CRO",
-    priceNgn: 194,
-    change: -0.28,
-    category: "Layer 1",
-    mark: "◇",
-  },
-  {
-    name: "VeChain",
-    symbol: "VET",
-    priceNgn: 48,
-    change: 1.12,
-    category: "Infrastructure",
-    mark: "V",
-  },
-  {
-    name: "Injective",
-    symbol: "INJ",
-    priceNgn: 38900,
-    change: 2.62,
-    category: "DeFi",
-    mark: "✦",
-  },
-  {
-    name: "Maker",
-    symbol: "MKR",
-    priceNgn: 3245000,
-    change: 0.44,
-    category: "DeFi",
-    mark: "M",
-  },
-  {
-    name: "Aave",
-    symbol: "AAVE",
-    priceNgn: 187000,
-    change: 1.35,
-    category: "DeFi",
-    mark: "A",
-  },
-  {
-    name: "Algorand",
-    symbol: "ALGO",
-    priceNgn: 292,
-    change: 0.58,
-    category: "Layer 1",
-    mark: "A",
-  },
-  {
-    name: "Sui",
-    symbol: "SUI",
-    priceNgn: 4130,
-    change: 4.12,
-    category: "Layer 1",
-    mark: "S",
-  },
-  {
-    name: "Sei",
-    symbol: "SEI",
-    priceNgn: 390,
-    change: 2.77,
-    category: "Layer 1",
-    mark: "S",
-  },
-  {
-    name: "Fantom",
-    symbol: "FTM",
-    priceNgn: 1080,
-    change: -0.66,
-    category: "Layer 1",
-    mark: "F",
-  },
-  {
-    name: "THORChain",
-    symbol: "RUNE",
-    priceNgn: 6120,
-    change: 1.89,
-    category: "DeFi",
-    mark: "ᚱ",
-  },
-  {
-    name: "Tezos",
-    symbol: "XTZ",
-    priceNgn: 1420,
-    change: -0.13,
-    category: "Layer 1",
-    mark: "ꜩ",
-  },
-  {
-    name: "Flow",
-    symbol: "FLOW",
-    priceNgn: 842,
-    change: 0.82,
-    category: "Layer 1",
-    mark: "F",
-  },
-  {
-    name: "Decentraland",
-    symbol: "MANA",
-    priceNgn: 710,
-    change: 1.04,
-    category: "Gaming",
-    mark: "M",
-  },
-  {
-    name: "The Sandbox",
-    symbol: "SAND",
-    priceNgn: 675,
-    change: -0.87,
-    category: "Gaming",
-    mark: "S",
-  },
-  {
-    name: "Axie Infinity",
-    symbol: "AXS",
-    priceNgn: 7240,
-    change: 2.18,
-    category: "Gaming",
-    mark: "A",
-  },
-  {
-    name: "The Graph",
-    symbol: "GRT",
-    priceNgn: 235,
-    change: 0.96,
-    category: "Infrastructure",
-    mark: "G",
-  },
-  {
-    name: "Lido DAO",
-    symbol: "LDO",
-    priceNgn: 2580,
-    change: 1.23,
-    category: "DeFi",
-    mark: "L",
-  },
-  {
-    name: "Pepe",
-    symbol: "PEPE",
-    priceNgn: 0.021,
-    change: 3.74,
-    category: "Meme",
-    mark: "P",
-  },
-  {
-    name: "dogwifhat",
-    symbol: "WIF",
-    priceNgn: 2870,
-    change: 2.95,
-    category: "Meme",
-    mark: "W",
-  },
-  {
-    name: "Bonk",
-    symbol: "BONK",
-    priceNgn: 0.043,
-    change: 1.68,
-    category: "Meme",
-    mark: "B",
-  },
-  {
-    name: "Celestia",
-    symbol: "TIA",
-    priceNgn: 7680,
-    change: 1.46,
-    category: "Infrastructure",
-    mark: "✦",
-  },
-];
+function getCategory(coin: MarketCoin): Exclude<CoinCategory, "All"> {
+  const mapped = categoryMap[coin.id];
+  if (mapped) return mapped;
+  const symbol = coin.symbol.toUpperCase();
+  if (
+    symbol.endsWith("USD") ||
+    symbol.endsWith("USDT") ||
+    symbol.endsWith("USDC") ||
+    symbol.endsWith("DAI") ||
+    symbol === "BUSD" ||
+    symbol === "TUSD" ||
+    symbol === "FRAX" ||
+    symbol === "USDP" ||
+    symbol === "FDUSD"
+  ) {
+    return "Stablecoin";
+  }
+  return "Layer 1";
+}
 
-const categories = [
-  "All coins",
+const categories: CoinCategory[] = [
+  "All",
   "Layer 1",
   "Stablecoin",
   "DeFi",
   "Meme",
   "Infrastructure",
   "Gaming",
-] as const;
+];
 
-const iconColors = [
-  "from-orange-400 to-amber-600",
-  "from-indigo-400 to-violet-700",
-  "from-emerald-400 to-teal-700",
-  "from-yellow-400 to-amber-600",
-  "from-slate-400 to-slate-700",
-  "from-blue-400 to-blue-700",
-  "from-fuchsia-400 to-violet-700",
-  "from-red-400 to-rose-700",
-] as const;
-
-const fxFromNgn: Record<WalletCurrency, number> = {
-  NGN: 1,
-  USD: 0.00067,
-  EUR: 0.00062,
-};
-
-const currencyLocale: Record<WalletCurrency, string> = {
-  NGN: "en-NG",
-  USD: "en-US",
-  EUR: "en-IE",
-};
-
-function formatPrice(priceNgn: number, currency: WalletCurrency) {
-  const amount = priceNgn * fxFromNgn[currency];
-  const digits = amount < 1 ? 4 : amount < 100 ? 2 : 2;
-  return new Intl.NumberFormat(currencyLocale[currency], {
+function formatCompact(
+  value: number | null | undefined,
+  currency: MarketCurrency,
+) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const locale =
+    currency === "ngn" ? "en-NG" : currency === "eur" ? "en-IE" : "en-US";
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency,
-    minimumFractionDigits: amount < 1 ? 4 : 2,
-    maximumFractionDigits: digits,
-  }).format(amount);
+    currency: currency.toUpperCase(),
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
-function CoinGlyph({ coin, index }: { coin: Coin; index: number }) {
+function formatChange(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function SearchIcon() {
   return (
-    <span
-      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br ${iconColors[index % iconColors.length]} text-[17px] font-bold text-white shadow-sm`}
+    <svg
       aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-[18px] w-[18px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
     >
-      {coin.mark}
-    </span>
+      <circle cx="10.8" cy="10.8" r="6.8" />
+      <path d="m16 16 4.5 4.5" />
+    </svg>
   );
 }
 
@@ -495,7 +263,7 @@ function StarIcon({ filled }: { filled: boolean }) {
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="h-[17px] w-[17px]"
+      className="h-[16px] w-[16px]"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth="1.7"
@@ -507,196 +275,245 @@ function StarIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function GridIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={`h-[17px] w-[17px] ${active ? "text-white" : "text-[#6b747d]"}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  );
+}
+
+function ListIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={`h-[17px] w-[17px] ${active ? "text-white" : "text-[#6b747d]"}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+    </svg>
+  );
+}
+
 export default function CoinsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [checking] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [coins, setCoins] = useState<MarketCoin[]>([]);
   const [query, setQuery] = useState("");
-  const [category, setCategory] =
-    useState<(typeof categories)[number]>("All coins");
-  const [sort, setSort] = useState("rank");
+  const [category, setCategory] = useState<CoinCategory>("All");
+  const [sort, setSort] = useState<SortOption>("rank");
+  const [view, setView] = useState<"grid" | "list">("list");
   const [watchlistOnly, setWatchlistOnly] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [currency, setCurrency] = useState<WalletCurrency>("NGN");
-  const [selectedCoin, setSelectedCoin] = useState<Coin | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [updatedAt, setUpdatedAt] = useState("");
+
+  const marketCurrency = currency.toLowerCase() as MarketCurrency;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        setUser(null);
         router.replace("/login");
         return;
       }
       setUser(currentUser);
-      router.replace("/markets");
+      setCheckingAuth(false);
     });
     return () => unsubscribe();
   }, [router]);
 
   useEffect(() => {
-    let watchlistFrame = 0;
-    try {
-      const stored = localStorage.getItem("qlx-coins-watchlist");
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored);
-        if (
-          Array.isArray(parsed) &&
-          parsed.every((item) => typeof item === "string")
-        ) {
-          watchlistFrame = window.requestAnimationFrame(() =>
-            setWatchlist(parsed),
-          );
-        }
-      }
-    } catch {}
-
-    const syncCurrency = () => setCurrency(getStoredCurrency());
-    syncCurrency();
-    window.addEventListener(walletPreferencesChangedEvent, syncCurrency);
-    window.addEventListener("storage", syncCurrency);
+    const syncPreferences = () => setCurrency(getStoredCurrency());
+    syncPreferences();
+    window.addEventListener(walletPreferencesChangedEvent, syncPreferences);
+    window.addEventListener("storage", syncPreferences);
     return () => {
-      if (watchlistFrame) window.cancelAnimationFrame(watchlistFrame);
-      window.removeEventListener(walletPreferencesChangedEvent, syncCurrency);
-      window.removeEventListener("storage", syncCurrency);
+      window.removeEventListener(
+        walletPreferencesChangedEvent,
+        syncPreferences,
+      );
+      window.removeEventListener("storage", syncPreferences);
     };
   }, []);
 
   useEffect(() => {
-    if (!selectedCoin) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setSelectedCoin(null);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedCoin]);
+    try {
+      const stored: unknown = JSON.parse(
+        localStorage.getItem(watchlistKey) ?? "[]",
+      );
+      if (
+        Array.isArray(stored) &&
+        stored.every((item) => typeof item === "string")
+      ) {
+        setWatchlist(stored);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      async () => {
+        setLoading(true);
+        setError("");
+        try {
+          const params = new URLSearchParams({
+            currency: marketCurrency,
+            per_page: "120",
+          });
+          if (query.trim()) params.set("query", query.trim());
+          const response = await fetch(`/api/market?${params.toString()}`, {
+            signal: controller.signal,
+            cache: "no-store",
+          });
+          const payload = (await response.json()) as
+            | MarketResponse
+            | { error?: string };
+          if (!response.ok || !("coins" in payload)) {
+            throw new Error(
+              "error" in payload && payload.error
+                ? payload.error
+                : "Coin directory is temporarily unavailable.",
+            );
+          }
+          setCoins(payload.coins);
+          setUpdatedAt(payload.updatedAt);
+        } catch (loadError) {
+          if (
+            loadError instanceof DOMException &&
+            loadError.name === "AbortError"
+          ) {
+            return;
+          }
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Coin directory is temporarily unavailable.",
+          );
+        } finally {
+          if (!controller.signal.aborted) setLoading(false);
+        }
+      },
+      query.trim() ? 350 : 0,
+    );
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [marketCurrency, query, refreshKey, user]);
 
   const filteredCoins = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const result = coins
-      .map((coin, index) => ({ coin, index }))
-      .filter(({ coin }) => {
-        const matchesQuery =
-          !normalizedQuery ||
-          `${coin.name} ${coin.symbol} ${coin.category}`
-            .toLowerCase()
-            .includes(normalizedQuery);
-        const matchesCategory =
-          category === "All coins" || coin.category === category;
-        const matchesWatchlist =
-          !watchlistOnly || watchlist.includes(coin.symbol);
-        return matchesQuery && matchesCategory && matchesWatchlist;
-      });
+    const filtered = coins.filter((coin) => {
+      const matchesCategory =
+        category === "All" || getCategory(coin) === category;
+      const matchesWatchlist =
+        !watchlistOnly || watchlist.includes(coin.symbol.toUpperCase());
+      return matchesCategory && matchesWatchlist;
+    });
 
     if (sort === "name") {
-      result.sort((a, b) => a.coin.name.localeCompare(b.coin.name));
-    } else if (sort === "price-high") {
-      result.sort((a, b) => b.coin.priceNgn - a.coin.priceNgn);
-    } else if (sort === "price-low") {
-      result.sort((a, b) => a.coin.priceNgn - b.coin.priceNgn);
-    } else if (sort === "gainers") {
-      result.sort((a, b) => b.coin.change - a.coin.change);
+      filtered.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === "price-desc") {
+      filtered.sort(
+        (a, b) =>
+          (b.current_price ?? -Infinity) - (a.current_price ?? -Infinity),
+      );
+    } else if (sort === "price-asc") {
+      filtered.sort(
+        (a, b) => (a.current_price ?? Infinity) - (b.current_price ?? Infinity),
+      );
+    } else if (sort === "change-desc") {
+      filtered.sort(
+        (a, b) =>
+          (b.price_change_percentage_24h ?? -Infinity) -
+          (a.price_change_percentage_24h ?? -Infinity),
+      );
+    } else if (sort === "change-asc") {
+      filtered.sort(
+        (a, b) =>
+          (a.price_change_percentage_24h ?? Infinity) -
+          (b.price_change_percentage_24h ?? Infinity),
+      );
+    } else if (sort === "volume-desc") {
+      filtered.sort(
+        (a, b) => (b.total_volume ?? -Infinity) - (a.total_volume ?? -Infinity),
+      );
+    } else {
+      filtered.sort(
+        (a, b) =>
+          (a.market_cap_rank ?? Infinity) - (b.market_cap_rank ?? Infinity),
+      );
     }
-    return result;
-  }, [category, query, sort, watchlist, watchlistOnly]);
+    return filtered;
+  }, [coins, category, sort, watchlist, watchlistOnly]);
 
-  function toggleWatchlist(symbol: string) {
+  const toggleWatchlist = useCallback((symbol: string) => {
     setWatchlist((current) => {
-      const next = current.includes(symbol)
-        ? current.filter((item) => item !== symbol)
-        : [...current, symbol];
+      const normalized = symbol.toUpperCase();
+      const next = current.includes(normalized)
+        ? current.filter((item) => item !== normalized)
+        : [...current, normalized];
       try {
-        localStorage.setItem("qlx-coins-watchlist", JSON.stringify(next));
+        localStorage.setItem(watchlistKey, JSON.stringify(next));
       } catch {}
       return next;
     });
-  }
+  }, []);
 
-  if (checking || !user) {
+  if (checkingAuth || !user) {
     return (
-      <div className="grid min-h-[70vh] flex-1 place-items-center bg-[#f7f8fa] px-4 dark:bg-[#101619]">
+      <div className="grid min-h-[70vh] place-items-center bg-[#f7f8fa] px-4 dark:bg-[#101619]">
         <p className="text-sm text-[#7b858d]">Loading your coin directory…</p>
       </div>
     );
   }
+
+  const updatedLabel = updatedAt
+    ? new Date(updatedAt).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "";
 
   return (
     <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
       <div className="h-1 w-full bg-[#27c84a]" />
       <WalletPageHeader active="All Coins" />
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-6 sm:px-6 sm:pb-12 sm:pt-9 lg:px-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#16875a]">
-              Discover
-            </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#20252b] sm:text-[30px] dark:text-[#f1f4f5]">
-              All Coins
-            </h1>
-            <p className="mt-1.5 max-w-xl text-sm leading-6 text-[#77808a]">
-              Browse and keep track of 50 digital assets in one place.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#e4e9e7] bg-white px-3 py-2 text-[10px] font-semibold text-[#68736d] dark:border-[#293238] dark:bg-[#171e23] dark:text-[#c7d0d5]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#d9a642]" />
-              Illustrative market data
-            </span>
-            <Link
-              href="/send"
-              className="hidden h-10 items-center justify-center rounded-full bg-[#075b9d] px-4 text-xs font-semibold text-white transition hover:bg-[#064c82] active:scale-[.98] sm:inline-flex"
-            >
-              Send funds
-            </Link>
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-3 gap-2.5 sm:gap-4">
-          {[
-            { label: "Listed assets", value: "50", detail: "Browse directory" },
-            { label: "Categories", value: "06", detail: "Filter by type" },
-            {
-              label: "Watchlist",
-              value: String(watchlist.length).padStart(2, "0"),
-              detail: "Saved on this device",
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-2xl border border-[#e9ecef] bg-white p-3 shadow-[0_5px_18px_rgba(25,36,50,0.025)] sm:p-5 dark:border-[#293238] dark:bg-[#171e23]"
-            >
-              <p className="text-[10px] font-medium text-[#89919a] sm:text-xs">
-                {item.label}
-              </p>
-              <p className="mt-1.5 text-xl font-bold tracking-tight text-[#252c32] sm:mt-2 sm:text-2xl dark:text-[#edf1f3]">
-                {item.value}
-              </p>
-              <p className="mt-1 hidden text-[10px] text-[#9aa1a8] sm:block">
-                {item.detail}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <section className="mt-5 overflow-hidden rounded-2xl border border-[#e9ecef] bg-white shadow-[0_8px_24px_rgba(25,36,50,0.035)] dark:border-[#293238] dark:bg-[#171e23]">
+      <main className="mx-auto w-full max-w-[1240px] px-4 pb-28 pt-5 sm:px-6 sm:pb-12 sm:pt-7 lg:px-10">
+        <section className="overflow-hidden rounded-2xl border border-[#e9ecef] bg-white shadow-[0_8px_24px_rgba(25,36,50,0.035)] dark:border-[#293238] dark:bg-[#171e23]">
           <div className="border-b border-[#edf0f2] p-4 sm:p-5 dark:border-[#293238]">
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex h-11 min-w-[220px] flex-1 items-center gap-2.5 rounded-xl border border-[#e6eaed] bg-[#fafbfc] px-3.5 transition focus-within:border-[#9dbed3] sm:max-w-[400px] dark:border-[#364149] dark:bg-[#202930]">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-[17px] w-[17px] shrink-0 text-[#7c858d]"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <circle cx="10.8" cy="10.8" r="6.8" />
-                  <path d="m16 16 4.5 4.5" />
-                </svg>
+              <label className="flex h-11 min-w-[220px] flex-1 items-center gap-2.5 rounded-xl border border-[#e6eaed] bg-[#fafbfc] px-3.5 transition focus-within:border-[#9dbed3] sm:max-w-[440px] dark:border-[#364149] dark:bg-[#202930]">
+                <span className="text-[#7c858d]">
+                  <SearchIcon />
+                </span>
                 <input
                   type="search"
-                  aria-label="Search coins"
+                  aria-label="Search all coins"
                   placeholder="Search by name or ticker"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
@@ -719,14 +536,18 @@ export default function CoinsPage() {
                 <select
                   aria-label="Sort coins"
                   value={sort}
-                  onChange={(event) => setSort(event.target.value)}
-                  className="h-full max-w-[150px] bg-transparent text-xs font-semibold text-[#424b53] outline-none dark:text-[#e2e8eb]"
+                  onChange={(event) =>
+                    setSort(event.target.value as SortOption)
+                  }
+                  className="h-full max-w-[170px] bg-transparent text-xs font-semibold text-[#424b53] outline-none dark:text-[#e2e8eb]"
                 >
                   <option value="rank">Market rank</option>
                   <option value="name">Name A–Z</option>
-                  <option value="price-high">Price: high to low</option>
-                  <option value="price-low">Price: low to high</option>
-                  <option value="gainers">Top demo change</option>
+                  <option value="price-desc">Price: high to low</option>
+                  <option value="price-asc">Price: low to high</option>
+                  <option value="change-desc">24h change: high to low</option>
+                  <option value="change-asc">24h change: low to high</option>
+                  <option value="volume-desc">Volume: high to low</option>
                 </select>
               </label>
 
@@ -743,6 +564,31 @@ export default function CoinsPage() {
                 <StarIcon filled={watchlistOnly} />
                 <span>Watchlist</span>
               </button>
+
+              <div className="flex items-center gap-1 rounded-xl bg-[#eef1f3] p-1 dark:bg-[#1b2227]">
+                <button
+                  type="button"
+                  aria-label="Grid view"
+                  aria-pressed={view === "grid"}
+                  onClick={() => setView("grid")}
+                  className={`grid h-9 w-9 place-items-center rounded-lg transition ${
+                    view === "grid" ? "bg-[#111820] dark:bg-white" : ""
+                  }`}
+                >
+                  <GridIcon active={view === "grid"} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="List view"
+                  aria-pressed={view === "list"}
+                  onClick={() => setView("list")}
+                  className={`grid h-9 w-9 place-items-center rounded-lg transition ${
+                    view === "list" ? "bg-[#111820] dark:bg-white" : ""
+                  }`}
+                >
+                  <ListIcon active={view === "list"} />
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -767,230 +613,329 @@ export default function CoinsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
             <p className="text-xs font-semibold text-[#4a535b] dark:text-[#d9e0e4]">
-              {watchlistOnly ? "Your watchlist" : "Coin directory"}
+              {query.trim()
+                ? `Results for “${query.trim()}”`
+                : watchlistOnly
+                  ? "Your watchlist"
+                  : category === "All"
+                    ? "Full directory"
+                    : `${category} assets`}
             </p>
-            <p className="text-[10px] text-[#9098a0]">
-              {filteredCoins.length}{" "}
-              {filteredCoins.length === 1 ? "asset" : "assets"}
+            <p
+              className="text-right text-[10px] text-[#9098a0]"
+              aria-live="polite"
+            >
+              {loading ? "Updating…" : `${filteredCoins.length} assets`}
+              {updatedLabel ? ` · ${updatedLabel}` : ""}
             </p>
           </div>
 
-          <div className="hidden grid-cols-[52px_minmax(220px,1fr)_minmax(120px,.7fr)_110px_44px] items-center gap-3 border-y border-[#eff1f3] bg-[#fafbfc] px-5 py-3 text-[10px] font-semibold uppercase tracking-[.1em] text-[#969da4] md:grid dark:border-[#293238] dark:bg-[#202930]">
-            <span>#</span>
-            <span>Asset</span>
-            <span>Price</span>
-            <span className="text-right">24h change</span>
-            <span className="sr-only">Watchlist</span>
-          </div>
+          {view === "list" ? (
+            <>
+              <div className="hidden grid-cols-[56px_minmax(220px,1fr)_minmax(120px,.7fr)_110px_minmax(120px,.7fr)_44px] items-center gap-3 border-y border-[#eff1f3] bg-[#fafbfc] px-5 py-3 text-[10px] font-semibold uppercase tracking-[.1em] text-[#969da4] md:grid dark:border-[#293238] dark:bg-[#202930]">
+                <span>Rank</span>
+                <span>Asset</span>
+                <span className="text-right">Price</span>
+                <span className="text-right">24h</span>
+                <span className="text-right">Volume</span>
+                <span className="sr-only">Watchlist</span>
+              </div>
 
-          <div className="divide-y divide-[#f0f2f3] dark:divide-[#293238]">
-            {filteredCoins.map(({ coin, index }, position) => {
-              const watching = watchlist.includes(coin.symbol);
-              const positive = coin.change >= 0;
-              return (
-                <div
-                  key={coin.symbol}
-                  className="group grid min-h-[75px] grid-cols-[minmax(0,1fr)_auto_36px] items-center gap-2 px-3 py-3 transition-colors hover:bg-[#fafcfd] animate-[coin-appear_.36s_cubic-bezier(.2,.8,0,1)_both] sm:gap-3 sm:px-5 md:grid-cols-[52px_minmax(220px,1fr)_minmax(120px,.7fr)_110px_44px] dark:hover:bg-[#1c252a]"
-                  style={{ animationDelay: `${Math.min(position, 18) * 22}ms` }}
-                >
-                  <span className="hidden text-xs font-medium text-[#a0a6ac] md:block">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCoin(coin)}
-                    className="flex min-w-0 items-center gap-3 text-left"
-                  >
-                    <CoinGlyph coin={coin} index={index} />
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-[13px] font-semibold text-[#30383f] sm:text-sm dark:text-[#edf1f3]">
-                          {coin.name}
-                        </span>
-                        <span className="hidden rounded-md bg-[#f1f3f5] px-1.5 py-0.5 text-[9px] font-semibold text-[#7c858d] sm:inline dark:bg-[#29343a] dark:text-[#bac4ca]">
-                          {coin.category}
-                        </span>
+              <div className="divide-y divide-[#f0f2f3] dark:divide-[#293238]">
+                {filteredCoins.map((coin, index) => {
+                  const change = coin.price_change_percentage_24h;
+                  const positive = (change ?? 0) >= 0;
+                  const watching = watchlist.includes(
+                    coin.symbol.toUpperCase(),
+                  );
+                  const coinCategory = getCategory(coin);
+                  return (
+                    <div
+                      key={coin.id}
+                      className="grid min-h-[76px] grid-cols-[minmax(0,1fr)_auto_38px] items-center gap-2 px-3 py-3 transition-colors hover:bg-[#fafcfd] sm:gap-3 sm:px-5 md:grid-cols-[56px_minmax(220px,1fr)_minmax(120px,.7fr)_110px_minmax(120px,.7fr)_44px] dark:hover:bg-[#1c252a]"
+                    >
+                      <span className="hidden text-xs font-medium text-[#a0a6ac] md:block">
+                        {coin.market_cap_rank
+                          ? `#${coin.market_cap_rank}`
+                          : String(index + 1)}
                       </span>
-                      <span className="mt-0.5 block text-[10px] font-medium tracking-wide text-[#929aa1]">
-                        {coin.symbol}
-                        <span className="ml-2 sm:hidden">
-                          · {coin.category}
+                      <Link
+                        href={`/coin/${encodeURIComponent(coin.id)}`}
+                        aria-label={`Open ${coin.name} details`}
+                        className="flex min-w-0 items-center gap-3"
+                      >
+                        <CoinLogo
+                          src={coin.image}
+                          name={coin.name}
+                          symbol={coin.symbol}
+                          size={40}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-semibold text-[#30383f] sm:text-sm dark:text-[#edf1f3]">
+                            {coin.name}
+                          </span>
+                          <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-[#929aa1]">
+                            {coin.symbol}
+                            <span className="rounded-md bg-[#f1f3f5] px-1.5 py-0.5 text-[9px] font-semibold capitalize text-[#7c858d] dark:bg-[#29343a] dark:text-[#bac4ca]">
+                              {coinCategory}
+                            </span>
+                          </span>
                         </span>
-                      </span>
-                    </span>
-                  </button>
+                      </Link>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCoin(coin)}
-                    className="text-right md:text-left"
+                      <Link
+                        href={`/coin/${encodeURIComponent(coin.id)}`}
+                        aria-label={`${coin.name} price and change`}
+                        className="text-right md:text-left"
+                      >
+                        <span className="block text-[12px] font-semibold tabular-nums text-[#3d454c] sm:text-sm dark:text-[#e4e9ec]">
+                          {formatMarketPrice(
+                            coin.current_price,
+                            marketCurrency,
+                          )}
+                        </span>
+                        <span
+                          className={`mt-1 block text-[10px] font-semibold tabular-nums md:hidden ${
+                            positive ? "text-[#16875a]" : "text-[#ce5c60]"
+                          }`}
+                        >
+                          {formatChange(change)}
+                        </span>
+                      </Link>
+
+                      <Link
+                        href={`/coin/${encodeURIComponent(coin.id)}`}
+                        aria-label={`${coin.name} 24-hour change`}
+                        className={`hidden text-right text-xs font-semibold tabular-nums md:block ${
+                          positive ? "text-[#16875a]" : "text-[#ce5c60]"
+                        }`}
+                      >
+                        {formatChange(change)}
+                      </Link>
+
+                      <Link
+                        href={`/coin/${encodeURIComponent(coin.id)}`}
+                        aria-label={`${coin.name} 24-hour volume`}
+                        className="hidden text-right text-xs font-medium tabular-nums text-[#59636b] md:block dark:text-[#d5dde1]"
+                      >
+                        {formatCompact(coin.total_volume, marketCurrency)}
+                      </Link>
+
+                      <button
+                        type="button"
+                        aria-label={`${watching ? "Remove" : "Add"} ${coin.name} ${watching ? "from" : "to"} watchlist`}
+                        aria-pressed={watching}
+                        onClick={() => toggleWatchlist(coin.symbol)}
+                        className={`grid h-9 w-9 place-items-center rounded-full transition hover:bg-amber-50 active:scale-90 dark:hover:bg-amber-950/30 ${
+                          watching
+                            ? "text-amber-500"
+                            : "text-[#b5bbc0] hover:text-amber-500"
+                        }`}
+                      >
+                        <StarIcon filled={watching} />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {loading && coins.length === 0 ? (
+                  <div className="px-4 py-12 text-center text-sm text-[#7c838b] sm:px-5">
+                    Loading the coin directory…
+                  </div>
+                ) : null}
+                {error ? (
+                  <div
+                    role="alert"
+                    className="mx-3 my-3 rounded-xl border border-[#f0d8cf] bg-[#fff8f5] px-4 py-3 text-xs leading-5 text-[#955340] sm:mx-5"
                   >
-                    <span className="block text-[12px] font-semibold tabular-nums text-[#3d454c] sm:text-sm dark:text-[#e4e9ec]">
-                      {formatPrice(coin.priceNgn, currency)}
-                    </span>
-                    <span
-                      className={`mt-1 block text-[10px] font-semibold tabular-nums md:hidden ${
-                        positive ? "text-[#16875a]" : "text-[#ce5c60]"
+                    <p>{error}</p>
+                    <button
+                      type="button"
+                      onClick={() => setRefreshKey((key) => key + 1)}
+                      className="mt-1 font-semibold underline underline-offset-2"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : null}
+                {!loading && !error && filteredCoins.length === 0 ? (
+                  <div className="px-4 py-14 text-center">
+                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f1f4f6] text-[#79858d] dark:bg-[#222c32]">
+                      <SearchIcon />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-[#4d565e] dark:text-[#e2e7ea]">
+                      {query.trim()
+                        ? "No matching coins found"
+                        : watchlistOnly
+                          ? "Your watchlist is empty"
+                          : "No assets in this category"}
+                    </p>
+                    <p className="mt-1 text-xs text-[#929aa1]">
+                      {query.trim()
+                        ? "Try a different name or ticker."
+                        : watchlistOnly
+                          ? "Star any asset to add it here."
+                          : "Pick another category from the filters above."}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredCoins.map((coin) => {
+                const change = coin.price_change_percentage_24h;
+                const positive = (change ?? 0) >= 0;
+                const watching = watchlist.includes(coin.symbol.toUpperCase());
+                const coinCategory = getCategory(coin);
+                return (
+                  <Link
+                    key={coin.id}
+                    href={`/coin/${encodeURIComponent(coin.id)}`}
+                    aria-label={`Open ${coin.name} details`}
+                    className="group relative flex flex-col rounded-2xl border border-[#e9ecef] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#cfd8de] hover:shadow-[0_10px_24px_rgba(25,36,50,0.06)] dark:border-[#293238] dark:bg-[#171e23] dark:hover:border-[#3a4750]"
+                  >
+                    <button
+                      type="button"
+                      aria-label={`${watching ? "Remove" : "Add"} ${coin.name} ${watching ? "from" : "to"} watchlist`}
+                      aria-pressed={watching}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        toggleWatchlist(coin.symbol);
+                      }}
+                      className={`absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full transition hover:bg-amber-50 active:scale-90 dark:hover:bg-amber-950/30 ${
+                        watching
+                          ? "text-amber-500"
+                          : "text-[#b5bbc0] hover:text-amber-500"
                       }`}
                     >
-                      {positive ? "+" : ""}
-                      {coin.change.toFixed(2)}%
-                    </span>
-                  </button>
+                      <StarIcon filled={watching} />
+                    </button>
 
-                  <span
-                    className={`hidden text-right text-xs font-semibold tabular-nums md:block ${
-                      positive ? "text-[#16875a]" : "text-[#ce5c60]"
-                    }`}
-                  >
-                    {positive ? "+" : ""}
-                    {coin.change.toFixed(2)}%
-                  </span>
+                    <div className="flex items-center gap-3">
+                      <CoinLogo
+                        src={coin.image}
+                        name={coin.name}
+                        symbol={coin.symbol}
+                        size={42}
+                      />
+                      <div className="min-w-0 pr-8">
+                        <p className="truncate text-sm font-semibold text-[#252c32] dark:text-[#edf1f3]">
+                          {coin.name}
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[#929aa1]">
+                          {coin.symbol}
+                        </p>
+                      </div>
+                    </div>
 
+                    <div className="mt-4">
+                      <p className="text-[11px] text-[#89919a]">Price</p>
+                      <p className="mt-0.5 text-lg font-bold tabular-nums text-[#252c32] dark:text-[#eef2f4]">
+                        {formatMarketPrice(coin.current_price, marketCurrency)}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 flex items-end justify-between">
+                      <div>
+                        <p className="text-[10px] text-[#89919a]">24h change</p>
+                        <p
+                          className={`mt-0.5 text-sm font-bold tabular-nums ${
+                            positive ? "text-[#16875a]" : "text-[#ce5c60]"
+                          }`}
+                        >
+                          {formatChange(change)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-[#89919a]">Volume</p>
+                        <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#59636b] dark:text-[#cdd6dc]">
+                          {formatCompact(coin.total_volume, marketCurrency)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-[#eef1f3] pt-3 dark:border-[#293238]">
+                      <span className="rounded-md bg-[#f1f3f5] px-2 py-0.5 text-[9px] font-semibold capitalize text-[#7c858d] dark:bg-[#29343a] dark:text-[#bac4ca]">
+                        {coinCategory}
+                      </span>
+                      <span className="text-[10px] font-medium text-[#929aa1]">
+                        {coin.market_cap_rank
+                          ? `Rank #${coin.market_cap_rank}`
+                          : `#${filteredCoins.indexOf(coin) + 1}`}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+
+              {loading && coins.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-sm text-[#7c838b]">
+                  Loading the coin directory…
+                </div>
+              ) : null}
+              {error ? (
+                <div
+                  role="alert"
+                  className="col-span-full rounded-xl border border-[#f0d8cf] bg-[#fff8f5] px-4 py-3 text-xs leading-5 text-[#955340]"
+                >
+                  <p>{error}</p>
                   <button
                     type="button"
-                    aria-label={`${watching ? "Remove" : "Add"} ${coin.name} ${watching ? "from" : "to"} watchlist`}
-                    aria-pressed={watching}
-                    onClick={() => toggleWatchlist(coin.symbol)}
-                    className={`grid h-9 w-9 place-items-center rounded-full transition hover:bg-amber-50 active:scale-90 ${
-                      watching
-                        ? "text-amber-500"
-                        : "text-[#b5bbc0] hover:text-amber-500"
-                    }`}
+                    onClick={() => setRefreshKey((key) => key + 1)}
+                    className="mt-1 font-semibold underline underline-offset-2"
                   >
-                    <StarIcon filled={watching} />
+                    Try again
                   </button>
                 </div>
-              );
-            })}
-            {filteredCoins.length === 0 ? (
-              <div className="px-4 py-14 text-center">
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f1f4f6] text-[#79858d] dark:bg-[#222c32]">
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  >
-                    <circle cx="10.8" cy="10.8" r="6.8" />
-                    <path d="m16 16 4.5 4.5" />
-                  </svg>
-                </div>
-                <p className="mt-3 text-sm font-semibold text-[#4d565e] dark:text-[#e2e7ea]">
-                  No coins found
-                </p>
-                <p className="mt-1 text-xs text-[#929aa1]">
-                  Try another search or category.
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="border-t border-[#eff1f3] bg-[#fafbfc] px-4 py-3 text-[10px] leading-5 text-[#89929a] sm:px-5 dark:border-[#293238] dark:bg-[#202930] dark:text-[#b6c0c6]">
-            Prices and 24-hour changes are illustrative examples, not live
-            market data or financial advice. No trading is performed from this
-            list.
-          </div>
-        </section>
-      </main>
-
-      {selectedCoin ? (
-        <div
-          className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-0 backdrop-blur-[2px] sm:place-items-center sm:p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setSelectedCoin(null);
-          }}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="coin-detail-title"
-            className="w-full max-w-md rounded-t-3xl border border-[#e8ecef] bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6 dark:border-[#293238] dark:bg-[#171e23]"
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#d8dde1] sm:hidden" />
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <CoinGlyph
-                  coin={selectedCoin}
-                  index={coins.indexOf(selectedCoin)}
-                />
-                <div>
-                  <h2
-                    id="coin-detail-title"
-                    className="text-base font-bold text-[#30383f] dark:text-[#edf1f3]"
-                  >
-                    {selectedCoin.name}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-[#8d969e]">
-                    {selectedCoin.symbol} · {selectedCoin.category}
+              ) : null}
+              {!loading && !error && filteredCoins.length === 0 ? (
+                <div className="col-span-full py-14 text-center">
+                  <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f1f4f6] text-[#79858d] dark:bg-[#222c32]">
+                    <SearchIcon />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-[#4d565e] dark:text-[#e2e7ea]">
+                    {query.trim()
+                      ? "No matching coins found"
+                      : watchlistOnly
+                        ? "Your watchlist is empty"
+                        : "No assets in this category"}
+                  </p>
+                  <p className="mt-1 text-xs text-[#929aa1]">
+                    {query.trim()
+                      ? "Try a different name or ticker."
+                      : watchlistOnly
+                        ? "Star any asset to add it here."
+                        : "Pick another category from the filters above."}
                   </p>
                 </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Close coin details"
-                onClick={() => setSelectedCoin(null)}
-                className="grid h-9 w-9 place-items-center rounded-full bg-[#f1f3f5] text-[#69737b] hover:bg-[#e8ecee] dark:bg-[#263138] dark:text-[#d2dade]"
-              >
-                ×
-              </button>
+              ) : null}
             </div>
-            <div className="mt-5 rounded-2xl bg-[#f6f8f9] p-4 dark:bg-[#202930]">
-              <p className="text-[10px] font-semibold uppercase tracking-[.12em] text-[#8b949c]">
-                Illustrative price
-              </p>
-              <p className="mt-1 text-2xl font-bold tracking-tight text-[#252c32] dark:text-[#eef2f4]">
-                {formatPrice(selectedCoin.priceNgn, currency)}
-              </p>
-              <p
-                className={`mt-1 text-xs font-semibold ${
-                  selectedCoin.change >= 0 ? "text-[#16875a]" : "text-[#ce5c60]"
-                }`}
-              >
-                {selectedCoin.change >= 0 ? "+" : ""}
-                {selectedCoin.change.toFixed(2)}% sample 24h change
-              </p>
-            </div>
-            <p className="mt-4 text-xs leading-5 text-[#89929a]">
-              Market prices are demo values. Trading and live market data are
-              not connected yet.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-2.5">
-              <Link
-                href="/send"
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-[#e1e6e9] text-xs font-semibold text-[#46515a] transition hover:bg-[#f7f8f9] dark:border-[#364149] dark:text-[#d8e0e4] dark:hover:bg-[#202930]"
-              >
-                Send funds
-              </Link>
-              <Link
-                href="/swap"
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-[#075b9d] text-xs font-semibold text-white transition hover:bg-[#064c82]"
-              >
-                Swap preview
-              </Link>
-            </div>
-          </section>
+          )}
+
+          <div className="border-t border-[#eff1f3] bg-[#fafbfc] px-4 py-3 text-[10px] leading-5 text-[#89929a] sm:px-5 dark:border-[#293238] dark:bg-[#202930] dark:text-[#b6c0c6]">
+            Prices, rankings, and 24-hour changes are provided by CoinGecko and
+            may be delayed. Asset categories are grouped for convenience and are
+            not financial advice.
+          </div>
+        </section>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-1 text-[11px] text-[#8a929a]">
+          <span>
+            Prices shown in {currency} based on your wallet preference.
+          </span>
+          <Link
+            href="/help"
+            className="font-semibold text-[#0b5f9e] hover:underline dark:text-[#71b8ea]"
+          >
+            Coin directory help
+          </Link>
         </div>
-      ) : null}
+      </main>
 
       <MobileWalletNav active="All Coins" />
-      <style jsx>{`
-        @keyframes coin-appear {
-          from {
-            opacity: 0;
-            transform: translateY(7px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 }

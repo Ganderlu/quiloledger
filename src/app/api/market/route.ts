@@ -36,11 +36,19 @@ function failureResponse(error: unknown) {
   return NextResponse.json({ error: message }, { status: 503 });
 }
 
+function parsePerPage(value: string | null, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.min(250, parsed));
+}
+
 export async function GET(request: NextRequest) {
   const currency = normalizeMarketCurrency(
     request.nextUrl.searchParams.get("currency"),
   );
   const query = request.nextUrl.searchParams.get("query")?.trim().slice(0, 80);
+  const perPage = parsePerPage(request.nextUrl.searchParams.get("per_page"), 50);
 
   try {
     if (query) {
@@ -54,7 +62,7 @@ export async function GET(request: NextRequest) {
             (left.market_cap_rank ?? Number.MAX_SAFE_INTEGER) -
             (right.market_cap_rank ?? Number.MAX_SAFE_INTEGER),
         )
-        .slice(0, 12);
+        .slice(0, 20);
 
       if (candidates.length === 0) {
         return NextResponse.json({
@@ -66,7 +74,7 @@ export async function GET(request: NextRequest) {
 
       const ids = candidates.map((coin) => coin.id).join(",");
       const coins = await getCoinGecko<MarketCoin[]>(
-        `/coins/markets?vs_currency=${currency}&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=12&page=1&sparkline=false`,
+        `/coins/markets?vs_currency=${currency}&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=20&page=1&sparkline=false`,
       );
 
       return NextResponse.json({
@@ -77,7 +85,7 @@ export async function GET(request: NextRequest) {
     }
 
     const coins = await getCoinGecko<MarketCoin[]>(
-      `/coins/markets?vs_currency=${currency}&order=market_cap_desc&per_page=50&page=1&sparkline=false`,
+      `/coins/markets?vs_currency=${currency}&order=market_cap_desc&per_page=${perPage}&page=1&sparkline=false`,
     );
 
     return NextResponse.json({
