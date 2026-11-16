@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
   DesktopWalletNav,
@@ -133,7 +133,6 @@ export default function SwapPage() {
   const [slippage, setSlippage] = useState("0.5");
   const [customSlippage, setCustomSlippage] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -177,14 +176,6 @@ export default function SwapPage() {
     [parsedAmount, fromToken.priceNgn],
   );
 
-  const userName =
-    user?.displayName || user?.email?.split("@")[0] || "Quilox member";
-
-  async function handleSignOut() {
-    await signOut(auth);
-    router.replace("/login");
-  }
-
   function selectFrom(value: string) {
     const next = value as TokenSymbol;
     setFromSymbol(next);
@@ -211,68 +202,11 @@ export default function SwapPage() {
   }
 
   return (
-    <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
+    <div className="qlx-wallet-app min-h-screen flex-1 overflow-x-hidden bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
       <div className="h-1 w-full bg-[#27c84a]" />
-      <header className="sticky top-0 z-30 border-b border-[#eceef1] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between gap-2 px-3 sm:h-[60px] sm:gap-3 sm:px-6 lg:px-10">
-          <Link
-            href="/dashboard"
-            className="flex shrink-0 items-center gap-2 text-[17px] font-bold tracking-tight text-[#111820] sm:text-xl"
-          >
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#071720] text-white">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="h-[18px] w-[18px]"
-                fill="none"
-              >
-                <path
-                  d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M8 12h8M12 8v8"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
-            QuiloxLedger
-          </Link>
+      <header className="sticky top-0 z-30 hidden bg-white/95 backdrop-blur md:block md:border-b md:border-[#eceef1]">
+        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-center gap-2 px-3 md:gap-3 md:px-6 lg:px-10">
           <DesktopWalletNav active="Swap" />
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              aria-label="Open account menu"
-              aria-expanded={accountMenuOpen}
-              onClick={() => setAccountMenuOpen((open) => !open)}
-              className="flex h-9 items-center gap-2 rounded-full border border-[#e6e9ec] px-2.5 text-xs font-semibold text-[#454c53] transition hover:bg-[#f7f8fa] sm:px-3"
-            >
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e6f4ec] text-[11px] font-bold text-[#188453]">
-                {userName.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="hidden max-w-32 truncate sm:block">
-                {userName}
-              </span>
-            </button>
-            {accountMenuOpen ? (
-              <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-[#e8eaee] bg-white p-4 shadow-xl">
-                <p className="truncate text-sm font-semibold">{userName}</p>
-                <p className="mt-1 truncate text-xs text-[#737a83]">
-                  {user?.email}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="mt-4 h-9 w-full rounded-lg border border-[#e8eaee] text-xs font-semibold text-[#4b5158] hover:bg-[#f7f8fa]"
-                >
-                  Sign out
-                </button>
-              </div>
-            ) : null}
-          </div>
         </div>
       </header>
 
@@ -297,8 +231,8 @@ export default function SwapPage() {
           </div>
         </div>
 
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <section className="rounded-2xl border border-[#e9ecef] bg-white p-3 shadow-[0_8px_24px_rgba(25,36,50,0.04)] sm:p-6">
+        <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+          <section className="min-w-0 rounded-2xl border border-[#e9ecef] bg-white p-3 shadow-[0_8px_24px_rgba(25,36,50,0.04)] sm:p-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-[#30363d] sm:text-base">
@@ -506,7 +440,7 @@ export default function SwapPage() {
             </button>
           </section>
 
-          <aside className="space-y-4 sm:space-y-5">
+          <aside className="min-w-0 space-y-4 sm:space-y-5">
             <section className="rounded-2xl border border-[#e9ecef] bg-white p-4 shadow-[0_8px_24px_rgba(25,36,50,0.035)] sm:p-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-[#30363d]">

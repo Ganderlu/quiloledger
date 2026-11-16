@@ -78,6 +78,13 @@ function Icon({
           <path d="m16 16 4.5 4.5" />
         </svg>
       );
+    case "user":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21v-1a8 8 0 0 1 16 0v1" />
+        </svg>
+      );
     case "eye":
       return (
         <svg {...props}>
@@ -130,10 +137,89 @@ function Icon({
           <path d="M8 12h.01M12 12h.01M16 12h.01" />
         </svg>
       );
+    case "scan":
+      return (
+        <svg {...props}>
+          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+          <path d="M3 12h18" />
+        </svg>
+      );
+    case "flame":
+      return (
+        <svg {...props}>
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5Z" />
+        </svg>
+      );
+    case "addfunds":
+      return (
+        <svg {...props}>
+          <circle cx="11" cy="8" r="3.2" />
+          <path d="M5.2 20a5.8 5.8 0 0 1 11.6 0" />
+          <path d="M11 10.2v3.6M9.6 12h2.8" />
+          <path d="M17.5 5v3M16 6.5h3" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...props}>
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      );
+    case "chevron-right":
+      return (
+        <svg {...props}>
+          <path d="m9 6 6 6-6 6" />
+        </svg>
+      );
     default:
       return null;
   }
 }
+
+type WalletNotification = {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  tone: "info" | "success" | "warning";
+};
+
+const initialNotifications: WalletNotification[] = [
+  {
+    id: "n1",
+    title: "Welcome to QuiloxLedger",
+    message:
+      "Your wallet is ready. Connect a wallet or buy crypto to get started.",
+    time: "Just now",
+    read: false,
+    tone: "info",
+  },
+  {
+    id: "n2",
+    title: "Market movers",
+    message: "Bitcoin is up 2.4% in the last hour. Tap to view live markets.",
+    time: "5 min ago",
+    read: false,
+    tone: "success",
+  },
+  {
+    id: "n3",
+    title: "Security check",
+    message: "Review your account security and recovery options.",
+    time: "1 hour ago",
+    read: false,
+    tone: "warning",
+  },
+  {
+    id: "n4",
+    title: "Virtual card activated",
+    message: "Your Quilox virtual card is ready for online spending.",
+    time: "2 hours ago",
+    read: true,
+    tone: "success",
+  },
+];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -148,6 +234,8 @@ export default function DashboardPage() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [notice, setNotice] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] =
+    useState<WalletNotification[]>(initialNotifications);
   const [accountOpen, setAccountOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -167,6 +255,29 @@ export default function DashboardPage() {
   function showNotice(message: string) {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2800);
+  }
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
+  function markAllRead() {
+    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+  }
+
+  function markNotificationRead(id: string) {
+    setNotifications((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, read: true } : item)),
+    );
+  }
+
+  function toneDot(tone: WalletNotification["tone"]) {
+    switch (tone) {
+      case "success":
+        return "bg-[#27c84a]";
+      case "warning":
+        return "bg-[#f5a623]";
+      default:
+        return "bg-[#075b9d]";
+    }
   }
 
   useEffect(() => {
@@ -313,99 +424,191 @@ export default function DashboardPage() {
     <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
       <div className="h-1 w-full bg-[#27c84a]" />
       <header className="sticky top-0 z-30 border-b border-[#eceef1] bg-white/95 backdrop-blur dark:border-[#293238] dark:bg-[#171e23]/95">
-        <div className="mx-auto flex h-[58px] max-w-[1440px] items-center justify-between px-3 sm:px-6 lg:px-10">
-          <div className="flex items-center gap-1.5 sm:gap-4">
+        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-2 px-3 sm:gap-3 sm:px-6 lg:px-10">
+          {/* Avatar */}
+          <div className="relative shrink-0">
             <button
               type="button"
-              aria-label="Settings"
-              onClick={openSettings}
-              className="grid h-8 w-7 place-items-center text-[#555c64] transition active:scale-95 sm:h-9 sm:w-8"
+              aria-label="Profile"
+              onClick={() => setAccountOpen((open) => !open)}
+              className="relative transition active:scale-95"
             >
-              <Icon name="settings" className="h-[18px] w-[18px]" />
-            </button>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1.5 text-[16px] font-bold tracking-tight text-[#111820] sm:gap-2 sm:text-[20px]"
-            >
-              <span className="grid h-6 w-6 place-items-center rounded-lg bg-[#071720] text-white sm:h-7 sm:w-7">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
-                  fill="none"
-                >
-                  <path
-                    d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M8 12h8M12 8v8"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[#e8f4ed] to-[#d6ecdd] text-sm font-bold text-[#239451] ring-1 ring-[#27c84a]/30 sm:h-10 sm:w-10">
+                {(user?.displayName || user?.email || "Q")
+                  .slice(0, 1)
+                  .toUpperCase()}
               </span>
-              QuiloxLedger
-            </Link>
-          </div>
-          <DesktopWalletNav active="Home" />
-          <div className="flex items-center gap-1 sm:gap-3">
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="Notifications"
-                aria-expanded={notificationsOpen}
-                onClick={() => setNotificationsOpen((open) => !open)}
-                className="grid h-8 w-7 place-items-center text-[#555c64] transition active:scale-95 sm:h-9 sm:w-8"
-              >
-                <Icon name="bell" className="h-[18px] w-[18px]" />
-              </button>
-              {notificationsOpen ? (
-                <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-[#e8eaee] bg-white p-4 shadow-xl">
-                  <p className="text-sm font-semibold">You’re all caught up</p>
-                  <p className="mt-1 text-xs leading-5 text-[#737a83]">
-                    Important wallet updates will appear here.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="Wallet account"
-                aria-expanded={accountOpen}
-                onClick={() => setAccountOpen((open) => !open)}
-                className="grid h-8 w-7 place-items-center text-[#555c64] transition active:scale-95 sm:h-9 sm:w-8"
-              >
-                <Icon name="wallet" className="h-[18px] w-[18px]" />
-              </button>
-              {accountOpen ? (
-                <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-[#e8eaee] bg-white p-4 shadow-xl">
-                  <p className="truncate text-sm font-semibold">
-                    {user?.displayName || "Your account"}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-[#737a83]">
-                    {user?.email}
-                  </p>
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-[#27c84a] dark:border-[#171e23]" />
+            </button>
+            {accountOpen ? (
+              <div className="absolute left-0 top-12 z-50 w-64 rounded-2xl border border-[#e8eaee] bg-white p-4 shadow-xl dark:border-[#293238] dark:bg-[#171e23]">
+                <p className="truncate text-sm font-semibold text-[#25282d] dark:text-white">
+                  {user?.displayName || "Your account"}
+                </p>
+                <p className="mt-1 truncate text-xs text-[#737a83] dark:text-[#aeb6bd]">
+                  {user?.email}
+                </p>
+                <div className="mt-4 space-y-1">
                   <button
                     type="button"
-                    onClick={handleSignOut}
-                    className="mt-4 h-9 w-full rounded-lg border border-[#e8eaee] text-xs font-semibold text-[#4b5158] hover:bg-[#f7f8fa]"
+                    onClick={() => {
+                      setAccountOpen(false);
+                      router.push("/profile");
+                    }}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold text-[#4b5158] transition hover:bg-[#f7f8fa] dark:text-[#d6dbe0] dark:hover:bg-white/5"
                   >
-                    Sign out
+                    <span>Profile</span>
+                    <Icon name="chevron-right" className="h-4 w-4" />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountOpen(false);
+                      openSettings();
+                    }}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold text-[#4b5158] transition hover:bg-[#f7f8fa] dark:text-[#d6dbe0] dark:hover:bg-white/5"
+                  >
+                    <span>Settings</span>
+                    <Icon name="chevron-right" className="h-4 w-4" />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="mt-3 h-9 w-full rounded-lg border border-[#e8eaee] text-xs font-semibold text-[#4b5158] transition hover:bg-[#f7f8fa] dark:border-[#293238] dark:text-[#d6dbe0] dark:hover:bg-white/5"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Search pill */}
+          <button
+            type="button"
+            aria-label="Search assets and markets"
+            onClick={() => router.push("/coins")}
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[#0c2932] px-3.5 py-2.5 text-left transition hover:bg-[#123a45] active:scale-[0.99] dark:bg-[#232b31] dark:hover:bg-[#2a343b] sm:px-4"
+          >
+            <Icon
+              name="search"
+              className="h-[18px] w-[18px] shrink-0 text-white/70"
+            />
+            <Icon
+              name="flame"
+              className="h-[18px] w-[18px] shrink-0 text-[#ff8a3d]"
+            />
+            <span className="truncate text-sm font-medium text-white/60">
+              Search assets, markets…
+            </span>
+          </button>
+
+          {/* Right actions */}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            <button
+              type="button"
+              aria-label="Receive"
+              onClick={() => router.push("/receive")}
+              className="grid h-9 w-9 place-items-center rounded-full text-[#555c64] transition hover:bg-[#f3f5f7] active:scale-95 dark:text-[#aeb6bd] dark:hover:bg-white/5 sm:h-10 sm:w-10"
+            >
+              <Icon name="scan" className="h-[19px] w-[19px]" />
+            </button>
+            <button
+              type="button"
+              aria-label="Send funds"
+              onClick={() => router.push("/send")}
+              className="grid h-9 w-9 place-items-center rounded-full text-[#555c64] transition hover:bg-[#f3f5f7] active:scale-95 dark:text-[#aeb6bd] dark:hover:bg-white/5 sm:h-10 sm:w-10"
+            >
+              <Icon name="addfunds" className="h-[19px] w-[19px]" />
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                aria-label={
+                  unreadCount > 0
+                    ? `Notifications, ${unreadCount} unread`
+                    : "Notifications"
+                }
+                aria-expanded={notificationsOpen}
+                onClick={() => setNotificationsOpen((open) => !open)}
+                className="relative grid h-9 w-9 place-items-center rounded-full text-[#555c64] transition hover:bg-[#f3f5f7] active:scale-95 dark:text-[#aeb6bd] dark:hover:bg-white/5 sm:h-10 sm:w-10"
+              >
+                <Icon name="bell" className="h-[19px] w-[19px]" />
+                {unreadCount > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#e74c3c] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-[#171e23]">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </button>
+              {notificationsOpen ? (
+                <div className="absolute right-0 top-12 z-50 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-[#e8eaee] bg-white shadow-2xl dark:border-[#293238] dark:bg-[#171e23]">
+                  <div className="flex items-center justify-between border-b border-[#f0f1f3] px-4 py-3 dark:border-[#293238]">
+                    <p className="text-sm font-bold text-[#25282d] dark:text-white">
+                      Notifications
+                    </p>
+                    {unreadCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={markAllRead}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#075b9d] transition hover:underline"
+                      >
+                        <Icon name="check" className="h-3.5 w-3.5" />
+                        Mark all read
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="max-h-[360px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-10 text-center">
+                        <p className="text-sm font-semibold text-[#555c64] dark:text-[#d6dbe0]">
+                          You’re all caught up
+                        </p>
+                        <p className="mt-1 text-xs text-[#9298a0] dark:text-[#7a828a]">
+                          New notifications will appear here.
+                        </p>
+                      </div>
+                    ) : (
+                      notifications.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => markNotificationRead(item.id)}
+                          className={`flex w-full gap-3 px-4 py-3 text-left transition hover:bg-[#f7f8fa] dark:hover:bg-white/5 ${
+                            !item.read ? "bg-[#f5faff] dark:bg-[#0c1a24]" : ""
+                          }`}
+                        >
+                          <span
+                            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                              item.read ? "bg-transparent" : toneDot(item.tone)
+                            }`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="truncate text-[13px] font-semibold text-[#25282d] dark:text-white">
+                                {item.title}
+                              </p>
+                              <span className="shrink-0 text-[10px] text-[#9298a0] dark:text-[#7a828a]">
+                                {item.time}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs leading-4 text-[#6b7280] dark:text-[#aeb6bd]">
+                              {item.message}
+                            </p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
               ) : null}
             </div>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="ml-2 hidden h-9 items-center rounded-full border border-[#e3e6e9] px-4 text-xs font-semibold text-[#434a52] transition hover:bg-[#f4f5f6] sm:inline-flex"
-            >
-              Sign out
-            </button>
+          </div>
+        </div>
+
+        {/* Desktop sub-navigation */}
+        <div className="hidden border-t border-[#f0f1f3] bg-[#fafbfc] md:block dark:border-[#293238] dark:bg-[#141b20]">
+          <div className="mx-auto flex max-w-[1440px] items-center px-4 sm:px-6 lg:px-10">
+            <DesktopWalletNav active="Home" />
           </div>
         </div>
       </header>

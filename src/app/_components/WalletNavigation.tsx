@@ -90,38 +90,9 @@ export function DesktopWalletNav({ active }: { active: string }) {
 
 export function WalletPageHeader({ active }: { active: string }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#eceef1] bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
-        <Link
-          href="/dashboard"
-          className="flex shrink-0 items-center gap-2 text-[17px] font-bold tracking-tight text-[#111820] sm:text-xl"
-        >
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#071720] text-white">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-[18px] w-[18px]"
-              fill="none"
-            >
-              <path
-                d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <path
-                d="M8 12h8M12 8v8"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          QuiloxLedger
-        </Link>
+    <header className="sticky top-0 z-30 hidden bg-white/95 backdrop-blur md:block md:border-b md:border-[#eceef1]">
+      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-center gap-4 px-4 sm:px-6 lg:px-10">
         <DesktopWalletNav active={active} />
-        <span className="hidden w-32 text-right text-[11px] text-[#8a929a] lg:block">
-          Your secure wallet
-        </span>
       </div>
     </header>
   );

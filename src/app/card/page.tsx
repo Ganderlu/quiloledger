@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
   DesktopWalletNav,
@@ -40,6 +39,15 @@ function CardIcon({
         <svg {...props}>
           <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6Z" />
           <circle cx="12" cy="12" r="2.5" />
+        </svg>
+      );
+    case "eyeOff":
+      return (
+        <svg {...props}>
+          <path d="M3 3l18 18" />
+          <path d="M10.6 10.6a2.5 2.5 0 0 0 3.5 3.5" />
+          <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c6.2 0 9.5 6 9.5 6a17.6 17.6 0 0 1-3.2 3.9" />
+          <path d="M6.6 6.6A17.6 17.6 0 0 0 2.5 11s3.3 6 9.5 6c1.7 0 3.3-.4 4.7-1.1" />
         </svg>
       );
     case "freeze":
@@ -82,9 +90,48 @@ function CardIcon({
           <path d="M3 10h18m-14 5h4" />
         </svg>
       );
+    case "plus":
+      return (
+        <svg {...props}>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      );
+    case "close":
+      return (
+        <svg {...props}>
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...props}>
+          <path d="m5 12 5 5 9-11" />
+        </svg>
+      );
+    case "copy":
+      return (
+        <svg {...props}>
+          <rect x="9" y="9" width="12" height="12" rx="2" />
+          <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+        </svg>
+      );
     default:
       return null;
   }
+}
+
+type PreferenceKey =
+  | "onlinePayments"
+  | "contactless"
+  | "internationalPayments"
+  | "atmWithdrawals";
+
+interface PreferenceRowProps {
+  title: string;
+  description: string;
+  icon: string;
+  checked: boolean;
+  onChange: () => void;
 }
 
 function PreferenceRow({
@@ -93,13 +140,7 @@ function PreferenceRow({
   icon,
   checked,
   onChange,
-}: {
-  title: string;
-  description: string;
-  icon: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
+}: PreferenceRowProps) {
   return (
     <div className="flex items-center gap-3 py-4">
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#f3f6f8] text-[#52606b]">
@@ -113,9 +154,9 @@ function PreferenceRow({
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={`${title} demo setting`}
+        aria-label={title}
         onClick={onChange}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
           checked ? "bg-[#16875a]" : "bg-[#d4d9de]"
         }`}
       >
@@ -125,6 +166,101 @@ function PreferenceRow({
           }`}
         />
       </button>
+    </div>
+  );
+}
+
+interface ConfirmDialogProps {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel,
+  cancelLabel = "Cancel",
+  danger = false,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <h3 className="text-lg font-bold tracking-tight text-[#20252b]">
+          {title}
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-[#6b7280]">{message}</p>
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-11 flex-1 rounded-xl border border-[#e4e8eb] text-sm font-semibold text-[#46505a] transition hover:bg-[#f7f8f9] active:scale-[.98]"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={`h-11 flex-1 rounded-xl text-sm font-semibold text-white transition active:scale-[.98] ${
+              danger
+                ? "bg-[#c0392b] hover:bg-[#a93226]"
+                : "bg-[#075b9d] hover:bg-[#064c82]"
+            }`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ModalShellProps {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+function ModalShell({ open, title, onClose, children }: ModalShellProps) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-lg font-bold tracking-tight text-[#20252b]">
+            {title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-8 w-8 place-items-center rounded-full text-[#7a828b] transition hover:bg-[#f3f5f7] active:scale-95"
+          >
+            <CardIcon name="close" className="h-5 w-5" />
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
@@ -139,8 +275,22 @@ export default function CardPage() {
   const [onlinePayments, setOnlinePayments] = useState(true);
   const [contactless, setContactless] = useState(true);
   const [internationalPayments, setInternationalPayments] = useState(false);
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [atmWithdrawals, setAtmWithdrawals] = useState(true);
+  const [cardBalance, setCardBalance] = useState(42850);
   const [notice, setNotice] = useState("");
+
+  // modals
+  const [fundModalOpen, setFundModalOpen] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [limitsModalOpen, setLimitsModalOpen] = useState(false);
+  const [replaceConfirm, setReplaceConfirm] = useState(false);
+  const [freezeConfirm, setFreezeConfirm] = useState(false);
+  const [fundAmount, setFundAmount] = useState("");
+  const [pinValue, setPinValue] = useState("");
+  const [pinConfirmValue, setPinConfirmValue] = useState("");
+  const [pinStage, setPinStage] = useState<"enter" | "confirm">("enter");
+  const [dailyLimit, setDailyLimit] = useState(100000);
+  const [monthlyLimit, setMonthlyLimit] = useState(500000);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -156,16 +306,122 @@ export default function CardPage() {
 
   function showNotice(message: string) {
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 2800);
+    window.setTimeout(() => setNotice(""), 3000);
   }
 
-  async function handleSignOut() {
-    await signOut(auth);
-    router.replace("/login");
+  const cardholder = useMemo(() => {
+    const raw =
+      user?.displayName || user?.email?.split("@")[0] || "QUILOX MEMBER";
+    return raw.toUpperCase();
+  }, [user]);
+
+  const maskedNumber = "••••  ••••  ••••  4821";
+  const fullNumber = "4821 0842 9000 4821";
+
+  const togglePreference = (key: PreferenceKey) => {
+    if (key === "onlinePayments") {
+      setOnlinePayments((v) => {
+        showNotice(v ? "Online payments disabled" : "Online payments enabled");
+        return !v;
+      });
+    } else if (key === "contactless") {
+      setContactless((v) => {
+        showNotice(
+          v ? "Contactless payments disabled" : "Contactless payments enabled",
+        );
+        return !v;
+      });
+    } else if (key === "internationalPayments") {
+      setInternationalPayments((v) => {
+        showNotice(
+          v
+            ? "International payments disabled"
+            : "International payments enabled",
+        );
+        return !v;
+      });
+    } else {
+      setAtmWithdrawals((v) => {
+        showNotice(v ? "ATM withdrawals disabled" : "ATM withdrawals enabled");
+        return !v;
+      });
+    }
+  };
+
+  function handleFundCard() {
+    const amount = Number(fundAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showNotice("Enter a valid amount");
+      return;
+    }
+    if (amount > 1000000) {
+      showNotice("Maximum funding amount is ₦1,000,000");
+      return;
+    }
+    setCardBalance((current) => current + amount);
+    setFundAmount("");
+    setFundModalOpen(false);
+    showNotice(`₦${amount.toLocaleString()} added to your card`);
   }
 
-  const cardholder =
-    user?.displayName || user?.email?.split("@")[0] || "QUILOX MEMBER";
+  function handleSetPin() {
+    if (pinValue.length !== 4) {
+      showNotice("PIN must be 4 digits");
+      return;
+    }
+    if (pinStage === "enter") {
+      setPinStage("confirm");
+      return;
+    }
+    if (pinValue !== pinConfirmValue) {
+      showNotice("PINs do not match");
+      setPinValue("");
+      setPinConfirmValue("");
+      setPinStage("enter");
+      return;
+    }
+    setPinValue("");
+    setPinConfirmValue("");
+    setPinStage("enter");
+    setPinModalOpen(false);
+    showNotice("Card PIN updated successfully");
+  }
+
+  function handleSaveLimits() {
+    if (dailyLimit < 1000 || monthlyLimit < dailyLimit) {
+      showNotice("Enter valid spending limits");
+      return;
+    }
+    setLimitsModalOpen(false);
+    showNotice("Spending limits updated");
+  }
+
+  function handleReplaceCard() {
+    setReplaceConfirm(false);
+    showNotice("Card replacement requested. You will be notified when ready.");
+  }
+
+  function handleFreezeToggle() {
+    if (!isFrozen) {
+      setFreezeConfirm(true);
+    } else {
+      setIsFrozen(false);
+      showNotice("Card unfrozen. You can now make payments.");
+    }
+  }
+
+  function confirmFreeze() {
+    setIsFrozen(true);
+    setFreezeConfirm(false);
+    showNotice("Card frozen. All payments are blocked.");
+  }
+
+  function copyCardNumber() {
+    navigator.clipboard
+      ?.writeText(fullNumber.replace(/\s/g, ""))
+      .catch(() => {});
+    showNotice("Card number copied");
+  }
 
   if (checking) {
     return (
@@ -175,83 +431,15 @@ export default function CardPage() {
     );
   }
 
+  const formatNaira = (amount: number) =>
+    `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   return (
-    <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
+    <div className="qlx-wallet-app min-h-screen flex-1 overflow-x-hidden bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
       <div className="h-1 w-full bg-[#27c84a]" />
-      <header className="sticky top-0 z-30 border-b border-[#eceef1] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-between gap-4 px-3 sm:px-6 lg:px-10">
-          <Link
-            href="/dashboard"
-            className="flex shrink-0 items-center gap-2 text-[17px] font-bold tracking-tight text-[#111820] sm:text-xl"
-          >
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#071720] text-white">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="h-[18px] w-[18px]"
-                fill="none"
-              >
-                <path
-                  d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M8 12h8M12 8v8"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
-            QuiloxLedger
-          </Link>
+      <header className="sticky top-0 z-30 hidden bg-white/95 backdrop-blur md:block md:border-b md:border-[#eceef1]">
+        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-center gap-4 px-3 md:px-6 lg:px-10">
           <DesktopWalletNav active="Card" />
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              aria-expanded={accountMenuOpen}
-              aria-label="Open account menu"
-              onClick={() => setAccountMenuOpen((open) => !open)}
-              className="flex h-9 items-center gap-2 rounded-full border border-[#e6e9ec] px-2.5 text-xs font-semibold text-[#454c53] transition hover:bg-[#f7f8fa] sm:px-3"
-            >
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e6f4ec] text-[11px] font-bold text-[#188453]">
-                {cardholder.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="hidden max-w-32 truncate sm:block">
-                {cardholder}
-              </span>
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                className="hidden h-3.5 w-3.5 sm:block"
-              >
-                <path
-                  d="m5 7.5 5 5 5-5"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            {accountMenuOpen ? (
-              <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-[#e8eaee] bg-white p-4 shadow-xl">
-                <p className="truncate text-sm font-semibold">{cardholder}</p>
-                <p className="mt-1 truncate text-xs text-[#737a83]">
-                  {user?.email}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="mt-4 h-9 w-full rounded-lg border border-[#e8eaee] text-xs font-semibold text-[#4b5158] hover:bg-[#f7f8fa]"
-                >
-                  Sign out
-                </button>
-              </div>
-            ) : null}
-          </div>
         </div>
       </header>
 
@@ -272,13 +460,11 @@ export default function CardPage() {
           <button
             type="button"
             onClick={() =>
-              showNotice(
-                "Card issuing is not available yet. This is a preview.",
-              )
+              showNotice("Physical card requests will be available soon.")
             }
             className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#075b9d] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#064c82] active:scale-[.98] sm:h-11 sm:px-5 sm:text-sm"
           >
-            <span className="text-lg leading-none">+</span>
+            <CardIcon name="plus" className="h-4 w-4" />
             Request a card
           </button>
         </div>
@@ -323,8 +509,8 @@ export default function CardPage() {
               <CardIcon name="card" className="h-4 w-4" />
             </span>
             <p className="leading-6">
-              Physical cards are not available yet. You can preview the design
-              below; requesting or activating a card is not enabled.
+              Physical card issuance is coming soon. Your virtual card is active
+              and ready to use for online and contactless payments.
             </p>
           </div>
         ) : null}
@@ -334,16 +520,20 @@ export default function CardPage() {
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-bold text-[#30363d] sm:text-base">
-                  {cardType === "virtual"
-                    ? "Virtual card preview"
-                    : "Physical card preview"}
+                  {cardType === "virtual" ? "Virtual card" : "Physical card"}
                 </h2>
                 <p className="mt-1 text-[11px] text-[#9298a0] sm:text-xs">
-                  Preview only · not enabled for payments
+                  {isFrozen ? "Card is frozen" : "Active · ready for payments"}
                 </p>
               </div>
-              <span className="rounded-full bg-[#fff5df] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.1em] text-[#a57313]">
-                Demo
+              <span
+                className={`rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.1em] ${
+                  isFrozen
+                    ? "bg-[#fbe9e7] text-[#b54f4f]"
+                    : "bg-[#e8f6ee] text-[#16875a]"
+                }`}
+              >
+                {isFrozen ? "Frozen" : "Active"}
               </span>
             </div>
 
@@ -383,7 +573,7 @@ export default function CardPage() {
                     </span>
                   </div>
                   <span className="rounded-full border border-white/20 px-2 py-1 text-[8px] font-bold uppercase tracking-[.15em] text-white/75 sm:text-[9px]">
-                    {cardType} · preview
+                    {cardType}
                   </span>
                 </div>
 
@@ -398,9 +588,7 @@ export default function CardPage() {
                       </span>
                     </div>
                     <p className="text-[12px] font-medium tracking-[.11em] sm:text-base sm:tracking-[.16em]">
-                      {detailsVisible
-                        ? "4821 0842 9000 4821"
-                        : "••••  ••••  ••••  4821"}
+                      {detailsVisible ? fullNumber : maskedNumber}
                     </p>
                     <div className="mt-3 flex items-end gap-6 sm:mt-4 sm:gap-8">
                       <div className="min-w-0">
@@ -419,6 +607,14 @@ export default function CardPage() {
                           12/30
                         </p>
                       </div>
+                      <div className="hidden sm:block">
+                        <p className="text-[7px] font-semibold uppercase tracking-[.16em] text-white/50 sm:text-[8px]">
+                          CVV
+                        </p>
+                        <p className="mt-1 text-[9px] font-semibold tracking-[.1em] sm:text-[11px]">
+                          {detailsVisible ? "342" : "•••"}
+                        </p>
+                      </div>
                     </div>
                   </div>
                   <div className="mb-1 text-right">
@@ -433,9 +629,9 @@ export default function CardPage() {
                 </div>
               </div>
               {isFrozen ? (
-                <div className="absolute inset-0 grid place-items-center bg-[#101a1d]/35 backdrop-blur-[1px]">
-                  <span className="rounded-full border border-white/30 bg-black/35 px-4 py-2 text-xs font-bold uppercase tracking-[.15em]">
-                    Preview frozen
+                <div className="absolute inset-0 grid place-items-center bg-[#101a1d]/45 backdrop-blur-[1px]">
+                  <span className="rounded-full border border-white/30 bg-black/40 px-4 py-2 text-xs font-bold uppercase tracking-[.15em]">
+                    Card frozen
                   </span>
                 </div>
               ) : null}
@@ -443,23 +639,36 @@ export default function CardPage() {
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-[10px] leading-4 text-[#8a9199]">
-                Sample card details only. This is not a payment card.
+                Keep your card details secure. Never share your CVV or PIN.
               </p>
-              <button
-                type="button"
-                onClick={() => setDetailsVisible((visible) => !visible)}
-                className="inline-flex h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#075b9d] transition hover:bg-[#f0f6fb] active:scale-[.98]"
-              >
-                <CardIcon name="eye" className="h-4 w-4" />
-                {detailsVisible ? "Hide number" : "Show sample number"}
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDetailsVisible((v) => !v)}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#075b9d] transition hover:bg-[#f0f6fb] active:scale-[.98]"
+                >
+                  <CardIcon
+                    name={detailsVisible ? "eyeOff" : "eye"}
+                    className="h-4 w-4"
+                  />
+                  {detailsVisible ? "Hide details" : "Show details"}
+                </button>
+                <button
+                  type="button"
+                  onClick={copyCardNumber}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-[#075b9d] transition hover:bg-[#f0f6fb] active:scale-[.98]"
+                  aria-label="Copy card number"
+                >
+                  <CardIcon name="copy" className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-[#eff1f3] pt-4 sm:grid-cols-3">
               <button
                 type="button"
                 aria-pressed={isFrozen}
-                onClick={() => setIsFrozen((frozen) => !frozen)}
+                onClick={handleFreezeToggle}
                 className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition active:scale-[.98] ${
                   isFrozen
                     ? "border-[#f0d6d6] bg-[#fff6f6] text-[#b54f4f]"
@@ -467,11 +676,16 @@ export default function CardPage() {
                 }`}
               >
                 <CardIcon name="freeze" className="h-4 w-4" />
-                {isFrozen ? "Unfreeze preview" : "Freeze preview"}
+                {isFrozen ? "Unfreeze card" : "Freeze card"}
               </button>
               <button
                 type="button"
-                onClick={() => showNotice("Card issuing is not available yet.")}
+                onClick={() => {
+                  setPinStage("enter");
+                  setPinValue("");
+                  setPinConfirmValue("");
+                  setPinModalOpen(true);
+                }}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#e7eaed] px-3 text-xs font-semibold text-[#48515a] transition hover:bg-[#f7f8f9] active:scale-[.98]"
               >
                 <CardIcon name="lock" className="h-4 w-4" />
@@ -479,7 +693,7 @@ export default function CardPage() {
               </button>
               <button
                 type="button"
-                onClick={() => showNotice("Card issuing is not available yet.")}
+                onClick={() => setReplaceConfirm(true)}
                 className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#e7eaed] px-3 text-xs font-semibold text-[#48515a] transition hover:bg-[#f7f8f9] active:scale-[.98] sm:col-span-1"
               >
                 <CardIcon name="shield" className="h-4 w-4" />
@@ -496,32 +710,34 @@ export default function CardPage() {
                     Available card balance
                   </p>
                   <p className="mt-2 text-[30px] font-bold tracking-tight text-[#20252b] sm:text-4xl">
-                    ₦0.00
+                    {formatNaira(cardBalance)}
                   </p>
                 </div>
-                <span className="rounded-full bg-[#fff5df] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[.1em] text-[#a57313]">
-                  Not issued
+                <span
+                  className={`rounded-full px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[.1em] ${
+                    isFrozen
+                      ? "bg-[#fbe9e7] text-[#b54f4f]"
+                      : "bg-[#e8f6ee] text-[#16875a]"
+                  }`}
+                >
+                  {isFrozen ? "Frozen" : "Active"}
                 </span>
               </div>
               <p className="mt-2 text-xs leading-5 text-[#8b929a]">
-                A card balance will be shown here after card services are
-                available.
+                Use this balance for online payments, subscriptions, and
+                contactless transactions.
               </p>
               <div className="mt-5 grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={() =>
-                    showNotice("Card funding is not available yet.")
-                  }
+                  onClick={() => setFundModalOpen(true)}
                   className="h-10 rounded-xl bg-[#075b9d] px-3 text-xs font-semibold text-white transition hover:bg-[#064c82] active:scale-[.98]"
                 >
                   Add money
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    showNotice("Card spending is not available yet.")
-                  }
+                  onClick={() => setLimitsModalOpen(true)}
                   className="h-10 rounded-xl border border-[#e4e8eb] px-3 text-xs font-semibold text-[#46505a] transition hover:bg-[#f7f8f9] active:scale-[.98]"
                 >
                   View limits
@@ -535,7 +751,7 @@ export default function CardPage() {
                   Card preferences
                 </h2>
                 <p className="mt-1 text-[11px] leading-5 text-[#9198a0]">
-                  Demo controls only; they do not change a real card.
+                  Control how and where your card can be used.
                 </p>
               </div>
               <PreferenceRow
@@ -543,7 +759,7 @@ export default function CardPage() {
                 description="Allow online purchases"
                 icon="card"
                 checked={onlinePayments}
-                onChange={() => setOnlinePayments((enabled) => !enabled)}
+                onChange={() => togglePreference("onlinePayments")}
               />
               <div className="border-t border-[#eff1f3]">
                 <PreferenceRow
@@ -551,7 +767,7 @@ export default function CardPage() {
                   description="Tap-to-pay transactions"
                   icon="contactless"
                   checked={contactless}
-                  onChange={() => setContactless((enabled) => !enabled)}
+                  onChange={() => togglePreference("contactless")}
                 />
               </div>
               <div className="border-t border-[#eff1f3]">
@@ -560,43 +776,223 @@ export default function CardPage() {
                   description="Payments outside your country"
                   icon="globe"
                   checked={internationalPayments}
-                  onChange={() =>
-                    setInternationalPayments((enabled) => !enabled)
-                  }
+                  onChange={() => togglePreference("internationalPayments")}
+                />
+              </div>
+              <div className="border-t border-[#eff1f3]">
+                <PreferenceRow
+                  title="ATM withdrawals"
+                  description="Cash withdrawals at ATMs"
+                  icon="lock"
+                  checked={atmWithdrawals}
+                  onChange={() => togglePreference("atmWithdrawals")}
                 />
               </div>
             </section>
           </div>
         </div>
-
-        <section className="mt-5 rounded-2xl border border-[#e9ecef] bg-white p-5 shadow-[0_8px_24px_rgba(25,36,50,0.035)] sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-[#30363d] sm:text-base">
-                Recent card activity
-              </h2>
-              <p className="mt-1 text-xs text-[#9298a0]">
-                Your card transactions will appear here.
-              </p>
-            </div>
-            <span className="rounded-full bg-[#f3f5f6] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.1em] text-[#7e8790]">
-              No activity
-            </span>
-          </div>
-          <div className="mt-5 flex flex-col items-center rounded-xl border border-dashed border-[#e4e8eb] bg-[#fafbfc] px-5 py-8 text-center">
-            <span className="grid h-11 w-11 place-items-center rounded-full bg-white text-[#7f8a93] shadow-sm">
-              <CardIcon name="card" className="h-5 w-5" />
-            </span>
-            <p className="mt-3 text-sm font-semibold text-[#535c64]">
-              No card transactions yet
-            </p>
-            <p className="mt-1 max-w-sm text-xs leading-5 text-[#9299a1]">
-              Transactions will show here once card issuing and payments are
-              enabled for your account.
-            </p>
-          </div>
-        </section>
       </main>
+
+      {/* Add Money Modal */}
+      <ModalShell
+        open={fundModalOpen}
+        title="Add money to card"
+        onClose={() => setFundModalOpen(false)}
+      >
+        <p className="text-sm leading-6 text-[#6b7280]">
+          Fund your Quilox card to start making payments instantly.
+        </p>
+        <div className="mt-4">
+          <label className="text-xs font-semibold text-[#52606b]">
+            Amount (₦)
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={fundAmount}
+            onChange={(e) => setFundAmount(e.target.value)}
+            placeholder="0.00"
+            className="mt-2 h-12 w-full rounded-xl border border-[#e4e8eb] px-4 text-lg font-bold text-[#20252b] outline-none transition focus:border-[#075b9d] focus:ring-2 focus:ring-[#075b9d]/15"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[5000, 10000, 25000, 50000].map((quick) => (
+              <button
+                key={quick}
+                type="button"
+                onClick={() => setFundAmount(String(quick))}
+                className="rounded-full border border-[#e4e8eb] px-3 py-1.5 text-xs font-semibold text-[#52606b] transition hover:bg-[#f7f8f9] active:scale-95"
+              >
+                ₦{quick.toLocaleString()}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-5 rounded-xl bg-[#f7f9fb] p-3 text-xs leading-5 text-[#7a828b]">
+          Current balance:{" "}
+          <span className="font-semibold text-[#30363d]">
+            {formatNaira(cardBalance)}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleFundCard}
+          className="mt-5 h-11 w-full rounded-xl bg-[#075b9d] text-sm font-semibold text-white transition hover:bg-[#064c82] active:scale-[.98]"
+        >
+          Add money
+        </button>
+      </ModalShell>
+
+      {/* Set PIN Modal */}
+      <ModalShell
+        open={pinModalOpen}
+        title={pinStage === "enter" ? "Set card PIN" : "Confirm PIN"}
+        onClose={() => {
+          setPinModalOpen(false);
+          setPinStage("enter");
+          setPinValue("");
+          setPinConfirmValue("");
+        }}
+      >
+        <p className="text-sm leading-6 text-[#6b7280]">
+          {pinStage === "enter"
+            ? "Create a 4-digit PIN to secure your card transactions."
+            : "Re-enter your 4-digit PIN to confirm."}
+        </p>
+        <div className="mt-5 flex justify-center gap-3">
+          {[0, 1, 2, 3].map((index) => {
+            const value =
+              pinStage === "enter" ? pinValue[index] : pinConfirmValue[index];
+            return (
+              <div
+                key={index}
+                className={`grid h-14 w-12 place-items-center rounded-xl border-2 text-xl font-bold transition ${
+                  value
+                    ? "border-[#075b9d] bg-[#f0f6fb] text-[#075b9d]"
+                    : "border-[#e4e8eb] text-[#30363d]"
+                }`}
+              >
+                {value ? "•" : ""}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
+            <button
+              key={digit}
+              type="button"
+              onClick={() => {
+                if (pinStage === "enter") {
+                  if (pinValue.length < 4) setPinValue(pinValue + digit);
+                } else {
+                  if (pinConfirmValue.length < 4)
+                    setPinConfirmValue(pinConfirmValue + digit);
+                }
+              }}
+              className="h-12 rounded-xl border border-[#e4e8eb] text-lg font-semibold text-[#30363d] transition hover:bg-[#f7f8f9] active:scale-95"
+            >
+              {digit}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              if (pinStage === "enter") {
+                setPinValue((v) => v.slice(0, -1));
+              } else {
+                setPinConfirmValue((v) => v.slice(0, -1));
+              }
+            }}
+            className="h-12 rounded-xl border border-[#e4e8eb] text-lg font-semibold text-[#52606b] transition hover:bg-[#f7f8f9] active:scale-95"
+            aria-label="Backspace"
+          >
+            ⌫
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (pinStage === "enter") {
+                if (pinValue.length < 4) setPinValue(pinValue + "0");
+              } else {
+                if (pinConfirmValue.length < 4)
+                  setPinConfirmValue(pinConfirmValue + "0");
+              }
+            }}
+            className="h-12 rounded-xl border border-[#e4e8eb] text-lg font-semibold text-[#30363d] transition hover:bg-[#f7f8f9] active:scale-95"
+          >
+            0
+          </button>
+          <button
+            type="button"
+            onClick={handleSetPin}
+            className="h-12 rounded-xl bg-[#075b9d] text-sm font-semibold text-white transition hover:bg-[#064c82] active:scale-95"
+          >
+            {pinStage === "enter" ? "Next" : "Save"}
+          </button>
+        </div>
+      </ModalShell>
+
+      {/* Spending Limits Modal */}
+      <ModalShell
+        open={limitsModalOpen}
+        title="Spending limits"
+        onClose={() => setLimitsModalOpen(false)}
+      >
+        <p className="text-sm leading-6 text-[#6b7280]">
+          Set daily and monthly spending limits for your card.
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-[#52606b]">
+              Daily limit (₦)
+            </label>
+            <input
+              type="number"
+              value={dailyLimit}
+              onChange={(e) => setDailyLimit(Number(e.target.value))}
+              className="mt-2 h-12 w-full rounded-xl border border-[#e4e8eb] px-4 text-base font-semibold text-[#20252b] outline-none transition focus:border-[#075b9d] focus:ring-2 focus:ring-[#075b9d]/15"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[#52606b]">
+              Monthly limit (₦)
+            </label>
+            <input
+              type="number"
+              value={monthlyLimit}
+              onChange={(e) => setMonthlyLimit(Number(e.target.value))}
+              className="mt-2 h-12 w-full rounded-xl border border-[#e4e8eb] px-4 text-base font-semibold text-[#20252b] outline-none transition focus:border-[#075b9d] focus:ring-2 focus:ring-[#075b9d]/15"
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveLimits}
+          className="mt-5 h-11 w-full rounded-xl bg-[#075b9d] text-sm font-semibold text-white transition hover:bg-[#064c82] active:scale-[.98]"
+        >
+          Save limits
+        </button>
+      </ModalShell>
+
+      {/* Confirmation dialogs */}
+      <ConfirmDialog
+        open={replaceConfirm}
+        title="Replace card"
+        message="Requesting a replacement will deactivate your current card and issue a new one. A new card number and CVV will be generated. Continue?"
+        confirmLabel="Replace card"
+        danger
+        onConfirm={handleReplaceCard}
+        onCancel={() => setReplaceConfirm(false)}
+      />
+      <ConfirmDialog
+        open={freezeConfirm}
+        title="Freeze card"
+        message="Freezing your card will block all payments and withdrawals until you unfreeze it. Continue?"
+        confirmLabel="Freeze card"
+        danger
+        onConfirm={confirmFreeze}
+        onCancel={() => setFreezeConfirm(false)}
+      />
 
       {notice ? (
         <div
