@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
-  DesktopWalletNav,
   MobileWalletNav,
+  WalletPageHeader,
 } from "../_components/WalletNavigation";
 
 const tokens = [
@@ -125,7 +125,6 @@ function formatAmount(value: number, maximumFractionDigits = 8) {
 
 export default function SwapPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [fromSymbol, setFromSymbol] = useState<TokenSymbol>("ETH");
   const [toSymbol, setToSymbol] = useState<TokenSymbol>("BTC");
@@ -140,7 +139,6 @@ export default function SwapPage() {
         router.replace("/login");
         return;
       }
-      setUser(currentUser);
       setChecking(false);
     });
     return () => unsubscribe();
@@ -203,12 +201,7 @@ export default function SwapPage() {
 
   return (
     <div className="qlx-wallet-app min-h-screen flex-1 overflow-x-hidden bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
-      <div className="h-1 w-full bg-[#27c84a]" />
-      <header className="sticky top-0 z-30 hidden bg-white/95 backdrop-blur md:block md:border-b md:border-[#eceef1]">
-        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-center gap-2 px-3 md:gap-3 md:px-6 lg:px-10">
-          <DesktopWalletNav active="Swap" />
-        </div>
-      </header>
+      <WalletPageHeader active="Swap" />
 
       <main className="mx-auto w-full max-w-[1180px] px-3 pb-28 pt-5 sm:px-6 sm:pb-12 sm:pt-9 lg:px-10">
         <div className="mb-4 sm:mb-6">

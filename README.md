@@ -20,6 +20,19 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Admin console
+
+The protected admin workspace is available at `/admin`. It reads registered profiles and contact messages from Firestore, verifies account status through Firebase Authentication, and supports disabling or re-enabling accounts and resolving inbox messages.
+
+Before using it, configure these server-only variables in `.env.local` and in your production host:
+
+- `FIREBASE_PROJECT_ID`: Firebase project ID.
+- `FIREBASE_CLIENT_EMAIL`: service account client email.
+- `FIREBASE_PRIVATE_KEY`: service account private key. Keep the escaped `\n` characters if the key is stored on one line.
+- `ADMIN_EMAILS`: comma-separated list of verified Firebase account emails permitted to use the console.
+
+Create a Firebase service account in the Firebase/GCP console and grant only the project permissions the admin API needs (Firebase Authentication user management and Firestore data access). Never use a `NEXT_PUBLIC_` prefix for these credentials or commit `.env.local`. Restart the development server after adding the values. Admin requests are checked on the server; Firebase Admin credentials bypass Firestore security rules and must be kept private.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

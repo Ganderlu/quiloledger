@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
-  DesktopWalletNav,
   MobileWalletNav,
+  WalletPageHeader,
 } from "../_components/WalletNavigation";
 import { SettingsPanel } from "../_components/SettingsPanel";
 
@@ -110,12 +110,7 @@ export default function ProfilePage() {
 
   return (
     <div className="qlx-wallet-app min-h-screen flex-1 overflow-x-hidden bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
-      <div className="h-1 w-full bg-[#27c84a]" />
-      <header className="sticky top-0 z-30 hidden bg-white/95 backdrop-blur md:block md:border-b md:border-[#eceef1]">
-        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-center gap-4 px-4 sm:px-6 lg:px-10">
-          <DesktopWalletNav active="" />
-        </div>
-      </header>
+      <WalletPageHeader active="" />
 
       <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 sm:pb-12 sm:pt-9 lg:px-10">
         <button

@@ -296,7 +296,6 @@ export default function CoinDetailPage() {
 
   return (
     <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
-      <div className="h-1 w-full bg-[#27c84a]" />
       <WalletPageHeader active="Home" />
 
       <main className="mx-auto w-full max-w-[1000px] px-3 pb-28 pt-4 sm:px-6 sm:pb-12 sm:pt-7">
@@ -490,7 +489,7 @@ export default function CoinDetailPage() {
                 {
                   label: "Swap",
                   icon: "swap" as const,
-                  href: `/swap?from=${coin.symbol}`,
+                  href: `/trade?from=${coin.symbol}`,
                 },
               ].map((action) => (
                 <Link
@@ -508,17 +507,20 @@ export default function CoinDetailPage() {
                 </Link>
               ))}
               {[
-                { label: "Buy", icon: "buy" as const },
-                { label: "Sell", icon: "sell" as const },
+                {
+                  label: "Buy",
+                  icon: "buy" as const,
+                  href: `/dashboard?buy=${encodeURIComponent(coin.symbol)}`,
+                },
+                {
+                  label: "Sell",
+                  icon: "sell" as const,
+                  href: `/trade?from=${encodeURIComponent(coin.symbol)}&sell=1`,
+                },
               ].map((action) => (
-                <button
+                <Link
                   key={action.label}
-                  type="button"
-                  onClick={() =>
-                    showNotice(
-                      `${action.label} is not enabled yet. No transaction has been made.`,
-                    )
-                  }
+                  href={action.href}
                   className="group flex flex-col items-center gap-1.5 text-[10px] font-medium text-[#58636b] transition active:scale-95 sm:text-xs dark:text-[#c4cdd2]"
                 >
                   <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#2d8bc8] to-[#075b9d] text-white shadow-sm transition group-hover:-translate-y-0.5 sm:h-11 sm:w-11">
@@ -528,7 +530,7 @@ export default function CoinDetailPage() {
                     />
                   </span>
                   {action.label}
-                </button>
+                </Link>
               ))}
             </section>
 

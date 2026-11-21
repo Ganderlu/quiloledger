@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
@@ -11,7 +11,10 @@ import {
   MobileWalletNav,
 } from "../_components/WalletNavigation";
 import { MobileSettingsSheet } from "../_components/SettingsPanel";
-import { BuyCryptoModal } from "../_components/BuyCryptoModal";
+import {
+  BuyCryptoModal,
+  type PurchaseCompletion,
+} from "../_components/BuyCryptoModal";
 import {
   WalletConnectModal,
   type WalletConnection,
@@ -30,6 +33,13 @@ import {
   walletPreferencesChangedEvent,
   type WalletCurrency,
 } from "@/lib/wallet-preferences";
+import {
+  addWalletNotification,
+  getWalletNotifications,
+  saveWalletNotifications,
+  walletNotificationsChangedEvent,
+  type WalletNotification,
+} from "@/lib/wallet-notifications";
 
 function Icon({
   name,
@@ -137,26 +147,10 @@ function Icon({
           <path d="M8 12h.01M12 12h.01M16 12h.01" />
         </svg>
       );
-    case "scan":
-      return (
-        <svg {...props}>
-          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
-          <path d="M3 12h18" />
-        </svg>
-      );
     case "flame":
       return (
         <svg {...props}>
           <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5Z" />
-        </svg>
-      );
-    case "addfunds":
-      return (
-        <svg {...props}>
-          <circle cx="11" cy="8" r="3.2" />
-          <path d="M5.2 20a5.8 5.8 0 0 1 11.6 0" />
-          <path d="M11 10.2v3.6M9.6 12h2.8" />
-          <path d="M17.5 5v3M16 6.5h3" />
         </svg>
       );
     case "check":
@@ -176,51 +170,6 @@ function Icon({
   }
 }
 
-type WalletNotification = {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-  tone: "info" | "success" | "warning";
-};
-
-const initialNotifications: WalletNotification[] = [
-  {
-    id: "n1",
-    title: "Welcome to QuiloxLedger",
-    message:
-      "Your wallet is ready. Connect a wallet or buy crypto to get started.",
-    time: "Just now",
-    read: false,
-    tone: "info",
-  },
-  {
-    id: "n2",
-    title: "Market movers",
-    message: "Bitcoin is up 2.4% in the last hour. Tap to view live markets.",
-    time: "5 min ago",
-    read: false,
-    tone: "success",
-  },
-  {
-    id: "n3",
-    title: "Security check",
-    message: "Review your account security and recovery options.",
-    time: "1 hour ago",
-    read: false,
-    tone: "warning",
-  },
-  {
-    id: "n4",
-    title: "Virtual card activated",
-    message: "Your Quilox virtual card is ready for online spending.",
-    time: "2 hours ago",
-    read: true,
-    tone: "success",
-  },
-];
-
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -234,21 +183,34 @@ export default function DashboardPage() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [notice, setNotice] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] =
-    useState<WalletNotification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<WalletNotification[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [walletConnectOpen, setWalletConnectOpen] = useState(false);
   const [buyCryptoOpen, setBuyCryptoOpen] = useState(false);
+  const [buyAssetSymbol, setBuyAssetSymbol] = useState("");
   const [walletConnection, setWalletConnection] =
     useState<WalletConnection | null>(null);
+  const lastNotifiedWallet = useRef("");
   const [currency, setCurrency] = useState<WalletCurrency>("NGN");
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const closeWalletConnect = useCallback(() => setWalletConnectOpen(false), []);
   const closeBuyCrypto = useCallback(() => setBuyCryptoOpen(false), []);
   const handleWalletConnectionChange = useCallback(
-    (connection: WalletConnection | null) => setWalletConnection(connection),
+    (connection: WalletConnection | null) => {
+      if (!connection) {
+        lastNotifiedWallet.current = "";
+      } else if (connection.address !== lastNotifiedWallet.current) {
+        lastNotifiedWallet.current = connection.address;
+        addWalletNotification({
+          title: "Wallet connected",
+          message: `${connection.walletName} is connected to your account.`,
+          tone: "success",
+        });
+      }
+      setWalletConnection(connection);
+    },
     [],
   );
 
@@ -257,16 +219,69 @@ export default function DashboardPage() {
     window.setTimeout(() => setNotice(""), 2800);
   }
 
+  useEffect(() => {
+    const requestedBuy = new URLSearchParams(window.location.search).get("buy");
+    if (!requestedBuy) return;
+    setBuyAssetSymbol(requestedBuy.toUpperCase());
+    setBuyCryptoOpen(true);
+  }, []);
+
+  async function handlePurchaseCompleted(purchase: PurchaseCompletion) {
+    let saved = false;
+    try {
+      if (!user) throw new Error("Please sign in to save this purchase.");
+      const token = await user.getIdToken();
+      const response = await fetch("/api/wallet/transactions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(purchase),
+      });
+      if (!response.ok) throw new Error("Purchase history could not be saved.");
+      saved = true;
+    } catch {}
+
+    const message = saved
+      ? "MoonPay reported the purchase complete and saved its transaction details. This report is not independently provider-verified; check your wallet for the deposit."
+      : "MoonPay reported the purchase complete, but its details could not be saved to account history. Check your wallet for the deposit.";
+    addWalletNotification({
+      title: "Purchase completed",
+      message,
+      tone: saved ? "success" : "warning",
+    });
+    showNotice(message);
+  }
+
   const unreadCount = notifications.filter((item) => !item.read).length;
 
+  useEffect(() => {
+    const syncNotifications = () => setNotifications(getWalletNotifications());
+    syncNotifications();
+    window.addEventListener(walletNotificationsChangedEvent, syncNotifications);
+    window.addEventListener("storage", syncNotifications);
+    return () => {
+      window.removeEventListener(
+        walletNotificationsChangedEvent,
+        syncNotifications,
+      );
+      window.removeEventListener("storage", syncNotifications);
+    };
+  }, []);
+
   function markAllRead() {
-    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+    const updated = notifications.map((item) => ({ ...item, read: true }));
+    setNotifications(updated);
+    saveWalletNotifications(updated);
   }
 
   function markNotificationRead(id: string) {
-    setNotifications((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, read: true } : item)),
+    const updated = notifications.map((item) =>
+      item.id === id ? { ...item, read: true } : item,
     );
+    setNotifications(updated);
+    saveWalletNotifications(updated);
   }
 
   function toneDot(tone: WalletNotification["tone"]) {
@@ -422,7 +437,6 @@ export default function DashboardPage() {
 
   return (
     <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
-      <div className="h-1 w-full bg-[#27c84a]" />
       <header className="sticky top-0 z-30 border-b border-[#eceef1] bg-white/95 backdrop-blur dark:border-[#293238] dark:bg-[#171e23]/95">
         <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-2 px-3 sm:gap-3 sm:px-6 lg:px-10">
           {/* Avatar */}
@@ -505,22 +519,6 @@ export default function DashboardPage() {
 
           {/* Right actions */}
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-            <button
-              type="button"
-              aria-label="Receive"
-              onClick={() => router.push("/receive")}
-              className="grid h-9 w-9 place-items-center rounded-full text-[#555c64] transition hover:bg-[#f3f5f7] active:scale-95 dark:text-[#aeb6bd] dark:hover:bg-white/5 sm:h-10 sm:w-10"
-            >
-              <Icon name="scan" className="h-[19px] w-[19px]" />
-            </button>
-            <button
-              type="button"
-              aria-label="Send funds"
-              onClick={() => router.push("/send")}
-              className="grid h-9 w-9 place-items-center rounded-full text-[#555c64] transition hover:bg-[#f3f5f7] active:scale-95 dark:text-[#aeb6bd] dark:hover:bg-white/5 sm:h-10 sm:w-10"
-            >
-              <Icon name="addfunds" className="h-[19px] w-[19px]" />
-            </button>
             <div className="relative">
               <button
                 type="button"
@@ -971,11 +969,8 @@ export default function DashboardPage() {
         currency={currency}
         coins={coins}
         walletConnection={walletConnection}
-        onPurchaseCompleted={() =>
-          showNotice(
-            "MoonPay reports the purchase completed. Verify the deposit in your wallet; balance sync is not connected yet.",
-          )
-        }
+        initialAssetSymbol={buyAssetSymbol}
+        onPurchaseCompleted={handlePurchaseCompleted}
       />
 
       <MobileWalletNav active="Home" />

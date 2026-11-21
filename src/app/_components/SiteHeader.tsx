@@ -281,11 +281,14 @@ export function SiteHeader() {
     pathname === "/swap" ||
     pathname === "/settings" ||
     pathname === "/send" ||
-    pathname === "/receive"
+    pathname === "/receive" ||
+    pathname === "/admin"
   ) {
     return null;
   }
 
+  const isMobileWalletRoute =
+    pathname === "/profile" || pathname.startsWith("/coin/");
   const overImage = isHome && !scrolled;
 
   const navLink = overImage
@@ -298,7 +301,7 @@ export function SiteHeader() {
 
   return (
     <header
-      className={`z-50 border-b transition-colors duration-300 ${
+      className={`${isMobileWalletRoute ? "hidden md:block " : ""}z-50 border-b transition-colors duration-300 ${
         overImage
           ? "absolute top-0 left-0 right-0 border-transparent bg-transparent"
           : "sticky top-0 border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-black/60"
@@ -465,21 +468,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-          {!isHome ? <ThemeToggle onImage={overImage} /> : null}
-          <button
-            type="button"
-            aria-label="Language"
-            className={`inline-flex h-10 items-center gap-2 rounded-full border px-2 text-sm font-medium transition-colors xl:px-4 ${
-              overImage
-                ? "border-white/30 text-white hover:bg-white/10"
-                : "border-blue-500 text-blue-700 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-white/10"
-            }`}
-          >
-            <HeaderIcon name="globe" className="h-4 w-4" />
-            {!isHome ? (
-              <span className="hidden sm:inline">Language</span>
-            ) : null}
-          </button>
+          <ThemeToggle onImage={overImage} />
           <Link
             href="/welcome"
             className={`hidden h-10 items-center justify-center rounded-full px-2 text-sm font-semibold shadow-sm transition-colors sm:inline-flex lg:order-3 lg:px-3 xl:px-5 ${

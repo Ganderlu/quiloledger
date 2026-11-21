@@ -25,7 +25,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const theme = (await cookies()).get("qlx-theme")?.value;
-  const isDark = theme === "dark";
+  // Dark is the default appearance for the whole product; light is opt-in.
+  const isDark = theme !== "light";
 
   return (
     <html

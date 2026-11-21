@@ -5,8 +5,8 @@ export function ThemeInitScript() {
   try {
     var key = "qlx-theme";
     var stored = localStorage.getItem(key);
-    var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var isDark = stored ? stored === "dark" : prefersDark;
+    // Dark is the default appearance for the whole product; light is opt-in.
+    var isDark = stored ? stored === "dark" : true;
     var root = document.documentElement;
     if (isDark) root.classList.add("dark"); else root.classList.remove("dark");
     root.style.colorScheme = isDark ? "dark" : "light";

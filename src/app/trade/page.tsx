@@ -61,16 +61,16 @@ type ApprovalPayload = {
 type TradeRecord = {
   hash: string;
   chainId: TradeChainId;
+  action: "swap" | "sell";
   fromSymbol: string;
   toSymbol: string;
   amountIn: string;
   amountOut: string;
   createdAt: number;
-  status: "pending" | "confirmed";
+  status: "pending" | "confirmed" | "failed";
 };
 
 const connectionKey = "qlx-wallet-connection";
-const historyKey = "qlx-trade-history";
 
 function readableTokenAmount(raw: string | null, decimals: number) {
   if (raw == null) return "Connect wallet to view";
@@ -207,6 +207,7 @@ export default function TradePage() {
   const [walletProvider, setWalletProvider] =
     useState<BrowserWalletProvider | null>(null);
   const [chainId, setChainId] = useState<TradeChainId>(1);
+  const [tradeAction, setTradeAction] = useState<"swap" | "sell">("swap");
   const [fromSymbol, setFromSymbol] = useState("ETH");
   const [toSymbol, setToSymbol] = useState("USDC");
   const [amount, setAmount] = useState("");
@@ -221,6 +222,8 @@ export default function TradePage() {
   const [tradeError, setTradeError] = useState("");
   const [tradeNotice, setTradeNotice] = useState("");
   const [history, setHistory] = useState<TradeRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
   const tokens = useMemo(() => getTradeTokens(chainId), [chainId]);
@@ -261,6 +264,63 @@ export default function TradePage() {
   }, [router]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedSymbol = params.get("from")?.toUpperCase();
+    const mappedSymbol = requestedSymbol === "BTC" ? "WBTC" : requestedSymbol;
+    if (params.get("sell") === "1") {
+      setTradeAction("sell");
+      setToSymbol("USDC");
+    }
+    if (
+      mappedSymbol &&
+      getTradeTokens(1).some((item) => item.symbol === mappedSymbol)
+    ) {
+      setChainId(1);
+      setFromSymbol(mappedSymbol);
+      if (params.get("sell") === "1") setToSymbol("USDC");
+    }
+  }, []);
+
+  useEffect(() => {
+    const currentUser = user;
+    if (!currentUser) return;
+    let cancelled = false;
+
+    async function loadHistory(authenticatedUser: User) {
+      setHistoryLoading(true);
+      setHistoryError("");
+      try {
+        const token = await authenticatedUser.getIdToken();
+        const response = await fetch("/api/trade/history", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          trades?: TradeRecord[];
+          error?: string;
+        };
+        if (!response.ok || !Array.isArray(payload.trades)) {
+          throw new Error(payload.error || "Could not load saved swaps.");
+        }
+        if (!cancelled) setHistory(payload.trades);
+      } catch {
+        if (!cancelled) {
+          setHistoryError(
+            "Your saved swaps could not be loaded right now. Please try again.",
+          );
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    }
+
+    void loadHistory(currentUser);
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
     try {
       const savedConnection: unknown = JSON.parse(
         localStorage.getItem(connectionKey) ?? "null",
@@ -282,22 +342,6 @@ export default function TradePage() {
         typeof savedConnection.walletName === "string"
       ) {
         setWalletConnection(savedConnection as WalletConnection);
-      }
-      const savedHistory: unknown = JSON.parse(
-        localStorage.getItem(historyKey) ?? "[]",
-      );
-      if (Array.isArray(savedHistory)) {
-        setHistory(
-          savedHistory.filter(
-            (item): item is TradeRecord =>
-              typeof item === "object" &&
-              item !== null &&
-              "hash" in item &&
-              typeof item.hash === "string" &&
-              "chainId" in item &&
-              (item.chainId === 1 || item.chainId === 8453),
-          ),
-        );
       }
     } catch {}
   }, []);
@@ -563,6 +607,46 @@ export default function TradePage() {
     );
   }
 
+  async function saveTradeHistory(record: TradeRecord) {
+    if (!user || !walletConnection) {
+      throw new Error("Sign in and connect your wallet to save this swap.");
+    }
+
+    const token = await user.getIdToken();
+    const response = await fetch("/api/trade/history", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...record,
+        walletAddress: walletConnection.address,
+      }),
+    });
+    if (!response.ok) throw new Error(await readApiError(response));
+
+    const payload = (await response.json()) as { trade?: TradeRecord };
+    if (!payload.trade) {
+      throw new Error("The saved swap could not be confirmed.");
+    }
+    return payload.trade;
+  }
+
+  function upsertTradeHistory(record: TradeRecord) {
+    setHistory((current) =>
+      [
+        record,
+        ...current.filter(
+          (item) =>
+            item.hash !== record.hash || item.chainId !== record.chainId,
+        ),
+      ]
+        .sort((first, second) => second.createdAt - first.createdAt)
+        .slice(0, 50),
+    );
+  }
+
   async function getApprovalState(amountBaseUnits: string) {
     const response = await fetch("/api/trade/approval", {
       method: "POST",
@@ -673,9 +757,10 @@ export default function TradePage() {
       const record: TradeRecord = {
         hash,
         chainId,
+        action: tradeAction,
         fromSymbol: fromToken.symbol,
         toSymbol: toToken.symbol,
-        amountIn: amount,
+        amountIn: formatTokenAmount(amountBaseUnits, fromToken.decimals),
         amountOut: formatTokenAmount(
           freshQuote.quote.output.amount,
           toToken.decimals,
@@ -683,28 +768,28 @@ export default function TradePage() {
         createdAt: Date.now(),
         status: "pending",
       };
-      setHistory((current) => {
-        const next = [record, ...current].slice(0, 8);
-        try {
-          localStorage.setItem(historyKey, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
+      upsertTradeHistory(record);
+      try {
+        upsertTradeHistory(await saveTradeHistory(record));
+      } catch {
+        // The confirmed write below retries saving this transaction.
+      }
 
       await waitForReceipt(walletProvider, hash, () =>
         setStage("Swap submitted. Waiting for on-chain confirmation…"),
       );
       const confirmed = { ...record, status: "confirmed" as const };
-      setHistory((current) => {
-        const next = current.map((item) =>
-          item.hash === hash ? confirmed : item,
+      upsertTradeHistory(confirmed);
+      try {
+        upsertTradeHistory(await saveTradeHistory(confirmed));
+        setHistoryError("");
+        setTradeNotice("Trade confirmed on-chain and saved to your account.");
+      } catch {
+        setHistoryError(
+          "The trade was confirmed, but its history could not be saved. Please try again later.",
         );
-        try {
-          localStorage.setItem(historyKey, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-      setTradeNotice("Trade confirmed on-chain.");
+        setTradeNotice("Trade confirmed on-chain.");
+      }
       setAmount("");
       setQuote(null);
       setReviewOpen(false);
@@ -769,7 +854,6 @@ export default function TradePage() {
 
   return (
     <div className="qlx-wallet-app min-h-screen flex-1 bg-[#f7f8fa] text-[#25282d] dark:bg-[#101619] dark:text-[#e9eef0]">
-      <div className="h-1 w-full bg-[#27c84a]" />
       <WalletPageHeader active="Swap" />
 
       <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-6 sm:px-6 sm:pb-12 sm:pt-9 lg:px-10">
@@ -779,11 +863,14 @@ export default function TradePage() {
               On-chain trading
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#20252b] sm:text-[30px] dark:text-[#f1f4f5]">
-              Trade tokens
+              {tradeAction === "sell"
+                ? `Sell ${fromToken.symbol} for ${toToken.symbol}`
+                : "Trade tokens"}
             </h1>
             <p className="mt-1.5 max-w-xl text-sm leading-6 text-[#77808a]">
-              Get a live Uniswap quote and swap directly from your connected
-              wallet on Ethereum or Base.
+              {tradeAction === "sell"
+                ? "Convert crypto to a supported token directly from your wallet. This is an on-chain swap, not a fiat cash-out."
+                : "Get a live Uniswap quote and swap directly from your connected wallet on Ethereum or Base."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1149,14 +1236,26 @@ export default function TradePage() {
                     Recent activity
                   </h2>
                   <p className="mt-1 text-[10px] text-[#9298a0]">
-                    Trades from this browser
+                    Saved to your account
                   </p>
                 </div>
                 <span className="rounded-full bg-[#f1f4f5] px-2 py-1 text-[10px] font-semibold text-[#737e85] dark:bg-[#263138] dark:text-[#c8d1d6]">
-                  {history.length}
+                  {historyLoading ? "…" : history.length}
                 </span>
               </div>
-              {history.length ? (
+              {historyError ? (
+                <p
+                  role="status"
+                  className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200"
+                >
+                  {historyError}
+                </p>
+              ) : null}
+              {historyLoading ? (
+                <p className="mt-3 rounded-xl bg-[#f8fafb] px-3 py-4 text-xs leading-5 text-[#89929a] dark:bg-[#202930] dark:text-[#b6c0c6]">
+                  Loading your saved swaps…
+                </p>
+              ) : history.length ? (
                 <div className="mt-3 divide-y divide-[#eff1f3] dark:divide-[#293238]">
                   {history.slice(0, 4).map((item) => (
                     <div
@@ -1165,6 +1264,7 @@ export default function TradePage() {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-xs font-semibold text-[#3b454c] dark:text-[#e0e6e9]">
+                          {item.action === "sell" ? "Sell · " : ""}
                           {item.amountIn} {item.fromSymbol} → {item.amountOut}{" "}
                           {item.toSymbol}
                         </p>
@@ -1186,7 +1286,7 @@ export default function TradePage() {
                 </div>
               ) : (
                 <p className="mt-3 rounded-xl bg-[#f8fafb] px-3 py-4 text-xs leading-5 text-[#89929a] dark:bg-[#202930] dark:text-[#b6c0c6]">
-                  Completed wallet-confirmed trades will appear here.
+                  Completed wallet-confirmed swaps will appear here.
                 </p>
               )}
             </section>
