@@ -29,6 +29,17 @@ type MoonPayQuote = {
   expiresAt: string | null;
 };
 
+export type PurchaseCompletion = {
+  transactionId: string;
+  providerTransactionId: string | null;
+  assetCode: string;
+  networkCode: string;
+  fiatAmount: number;
+  fiatCurrency: string;
+  cryptoAmount: number;
+  walletAddress: string | null;
+};
+
 type MoonPayWidget = {
   show: () => void;
   generateUrlForSigning: () => string;
@@ -94,12 +105,32 @@ function formatNetworkName(networkCode: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function getMoonPayTransactionId(details: unknown) {
+  if (typeof details !== "object" || details === null) return "";
+  const record = details as Record<string, unknown>;
+  const transaction =
+    typeof record.transaction === "object" && record.transaction !== null
+      ? (record.transaction as Record<string, unknown>)
+      : record;
+  for (const key of ["id", "transactionId", "externalTransactionId"]) {
+    const value = transaction[key];
+    if (
+      (typeof value === "string" || typeof value === "number") &&
+      String(value).trim()
+    ) {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
 export function BuyCryptoModal({
   open,
   onClose,
   currency,
   coins,
   walletConnection,
+  initialAssetSymbol,
   onPurchaseCompleted,
 }: {
   open: boolean;
@@ -107,7 +138,8 @@ export function BuyCryptoModal({
   currency: WalletCurrency;
   coins: MarketCoin[];
   walletConnection: WalletConnection | null;
-  onPurchaseCompleted: () => void;
+  initialAssetSymbol?: string;
+  onPurchaseCompleted: (purchase: PurchaseCompletion) => void;
 }) {
   const [currencies, setCurrencies] = useState<ProviderCurrency[]>([]);
   const [selectedCurrencyCode, setSelectedCurrencyCode] = useState("");
@@ -216,18 +248,26 @@ export function BuyCryptoModal({
 
   useEffect(() => {
     if (!cryptoCurrencies.length) return;
-    if (
-      selectedCurrencyCode &&
-      cryptoCurrencies.some((item) => item.code === selectedCurrencyCode)
-    ) {
-      return;
-    }
+    const requestedSymbol = initialAssetSymbol?.toLowerCase();
+    const requestedCurrency = requestedSymbol
+      ? cryptoCurrencies.find(
+          (item) =>
+            item.code.toLowerCase() === requestedSymbol ||
+            item.code.toLowerCase().startsWith(`${requestedSymbol}_`),
+        )
+      : undefined;
     const preferred =
       cryptoCurrencies.find((item) => item.code === "btc") ??
       cryptoCurrencies.find((item) => item.code === "eth") ??
       cryptoCurrencies[0];
-    setSelectedCurrencyCode(preferred.code);
-  }, [cryptoCurrencies, selectedCurrencyCode]);
+    if (!open) return;
+    setSelectedCurrencyCode((current) => {
+      if (requestedCurrency) return requestedCurrency.code;
+      return cryptoCurrencies.some((item) => item.code === current)
+        ? current
+        : preferred.code;
+    });
+  }, [cryptoCurrencies, initialAssetSymbol, open]);
 
   useEffect(() => {
     if (!fiatCurrencies.length) return;
@@ -338,8 +378,19 @@ export function BuyCryptoModal({
         variant: "overlay",
         params,
         handlers: {
-          onTransactionCompleted: () => {
-            onPurchaseCompleted();
+          onTransactionCompleted: (details) => {
+            const providerTransactionId = getMoonPayTransactionId(details);
+            onPurchaseCompleted({
+              transactionId:
+                providerTransactionId || `callback-${crypto.randomUUID()}`,
+              providerTransactionId: providerTransactionId || null,
+              assetCode: selectedCrypto.code,
+              networkCode: selectedCrypto.networkCode,
+              fiatAmount: quote.baseCurrencyAmount,
+              fiatCurrency: selectedFiatCode,
+              cryptoAmount: quote.quoteCurrencyAmount,
+              walletAddress: params.walletAddress ?? null,
+            });
             closeModal();
           },
           onCloseOverlay: () => {},
